@@ -9,9 +9,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { ErrorLog } from '@/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function ErrorLogs() {
   const [logs, setLogs] = useState<ErrorLog[]>([]);
@@ -37,13 +38,13 @@ export function ErrorLogs() {
     }
   }
 
-  async function handleMarkInvestigated(errorId: string) {
+  async function handleToggleInvestigated(errorId: string, currentStatus: boolean) {
     try {
       await markErrorAsInvestigated(errorId);
       await loadLogs();
       toast({
         title: 'Success',
-        description: 'Error marked as investigated',
+        description: `Error marked as ${currentStatus ? 'active' : 'investigated'}`,
       });
     } catch (error) {
       toast({
@@ -55,7 +56,76 @@ export function ErrorLogs() {
   }
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  const activeErrors = logs.filter(log => !log.investigated);
+  const investigatedErrors = logs.filter(log => log.investigated);
+
+  return (
+    <div className="space-y-8">
+      {/* Active Errors */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            Active Errors
+          </CardTitle>
+          <CardDescription>
+            Errors that need investigation
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ErrorTable
+            errors={activeErrors}
+            onToggleStatus={handleToggleInvestigated}
+            emptyMessage="No active errors"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Investigated Errors */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-muted-foreground" />
+            Investigated Errors
+          </CardTitle>
+          <CardDescription>
+            Previously investigated errors
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ErrorTable
+            errors={investigatedErrors}
+            onToggleStatus={handleToggleInvestigated}
+            emptyMessage="No investigated errors"
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ErrorTable({ 
+  errors, 
+  onToggleStatus,
+  emptyMessage 
+}: { 
+  errors: ErrorLog[],
+  onToggleStatus: (id: string, status: boolean) => Promise<void>,
+  emptyMessage: string
+}) {
+  if (errors.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        {emptyMessage}
+      </div>
+    );
   }
 
   return (
@@ -66,35 +136,35 @@ export function ErrorLogs() {
             <TableHead>Time</TableHead>
             <TableHead>Message</TableHead>
             <TableHead>Stack Trace</TableHead>
-            <TableHead>Status</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {logs.map((log) => (
+          {errors.map((log) => (
             <TableRow key={log.id}>
               <TableCell>{new Date(log.created_at).toLocaleString()}</TableCell>
               <TableCell>{log.message}</TableCell>
               <TableCell className="font-mono text-xs">
                 {log.stack_trace ? (
-                  <pre className="max-h-40 overflow-auto">{log.stack_trace}</pre>
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap">
+                    {log.stack_trace}
+                  </pre>
                 ) : (
                   'No stack trace'
                 )}
               </TableCell>
               <TableCell>
-                {log.investigated ? 'Investigated' : 'Pending'}
-              </TableCell>
-              <TableCell>
-                {!log.investigated && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleMarkInvestigated(log.id)}
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onToggleStatus(log.id, log.investigated)}
+                >
+                  {log.investigated ? (
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
               </TableCell>
             </TableRow>
           ))}

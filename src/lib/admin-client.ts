@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
+import { supabase } from './supabase'; // Import the main client
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -12,7 +13,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const adminClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
-    persistSession: false
+    persistSession: true
   }
 });
 
@@ -39,20 +40,45 @@ function checkRateLimit(userId: string): boolean {
 }
 
 // Admin helper functions with rate limiting and input validation
+export async function getAllUsers() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession(); // Use main client
+    if (!session?.user) {
+      throw new Error('No authenticated user found');
+    }
+    
+    console.log('Current user:', session.user);
+    
+    if (!checkRateLimit(session.user.id)) {
+      throw new Error('Rate limit exceeded. Please try again later.');
+    }
+
+    const { data, error } = await adminClient.rpc('get_all_users');
+    
+    if (error) {
+      console.error('Error fetching users:', error, error.message, error.details);
+      throw error;
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('getAllUsers error:', err);
+    throw err;
+  }
+}
+
 export async function setUserAsAdmin(userId: string) {
   if (!userId || typeof userId !== 'string') {
     throw new Error('Invalid user ID');
   }
 
-  if (!checkRateLimit(userId)) {
+  const { data: { session } } = await supabase.auth.getSession(); // Use main client
+  
+  if (!session?.user || !checkRateLimit(session.user.id)) {
     throw new Error('Rate limit exceeded. Please try again later.');
   }
 
-  const { error } = await adminClient
-    .from('users')
-    .update({ is_admin: true })
-    .eq('id', userId);
-
+  const { error } = await adminClient.rpc('upgrade_to_admin', { user_id: userId });
   if (error) throw error;
 }
 
@@ -61,48 +87,41 @@ export async function removeUserAdmin(userId: string) {
     throw new Error('Invalid user ID');
   }
 
-  if (!checkRateLimit(userId)) {
-    throw new Error('Rate limit exceeded. Please try again later.');
-  }
-
-  const { error } = await adminClient
-    .from('users')
-    .update({ is_admin: false })
-    .eq('id', userId);
-
-  if (error) throw error;
-}
-
-export async function getAllUsers() {
-  const { data: { user } } = await adminClient.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession(); // Use main client
   
-  if (!user || !checkRateLimit(user.id)) {
+  if (!session?.user || !checkRateLimit(session.user.id)) {
     throw new Error('Rate limit exceeded. Please try again later.');
   }
 
-  const { data, error } = await adminClient
-    .from('users')
-    .select('*')
-    .order('created_at', { ascending: false });
-
+  const { error } = await adminClient.rpc('revoke_admin', { user_id: userId });
   if (error) throw error;
-  return data;
 }
 
 export async function getErrorLogs() {
-  const { data: { user } } = await adminClient.auth.getUser();
-  
-  if (!user || !checkRateLimit(user.id)) {
-    throw new Error('Rate limit exceeded. Please try again later.');
+  try {
+    const { data: { session } } = await supabase.auth.getSession(); // Use main client
+    if (!session?.user) {
+      throw new Error('No authenticated user found');
+    }
+    
+    console.log('Current user:', session.user);
+    
+    if (!checkRateLimit(session.user.id)) {
+      throw new Error('Rate limit exceeded. Please try again later.');
+    }
+
+    const { data, error } = await adminClient.rpc('get_error_logs');
+    
+    if (error) {
+      console.error('Error fetching error logs:', error, error.message, error.details);
+      throw error;
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('getErrorLogs error:', err);
+    throw err;
   }
-
-  const { data, error } = await adminClient
-    .from('error_logs')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data;
 }
 
 export async function markErrorAsInvestigated(errorId: string) {
@@ -110,16 +129,13 @@ export async function markErrorAsInvestigated(errorId: string) {
     throw new Error('Invalid error ID');
   }
 
-  const { data: { user } } = await adminClient.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession(); // Use main client
   
-  if (!user || !checkRateLimit(user.id)) {
+  if (!session?.user || !checkRateLimit(session.user.id)) {
     throw new Error('Rate limit exceeded. Please try again later.');
   }
 
-  const { error } = await adminClient
-    .from('error_logs')
-    .update({ investigated: true })
-    .eq('id', errorId);
+  const { error } = await adminClient.rpc('mark_error_investigated', { error_id: errorId });
 
   if (error) throw error;
 }

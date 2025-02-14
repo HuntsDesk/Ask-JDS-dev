@@ -3,10 +3,12 @@ import { supabase } from '@/lib/supabase';
 import { Message } from '@/types';
 import { useToast } from './use-toast';
 import { logError } from '@/lib/supabase';
+import { generateResponse } from '@/lib/openai';
 
 export function useMessages(threadId: string | null, onFirstMessage?: (message: string) => void) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
   const loadAttemptRef = useRef(0);
   const messageMapRef = useRef<Map<string, Message>>(new Map());
@@ -94,7 +96,13 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
             const newMessage = payload.new as Message;
             if (!messageMapRef.current.has(newMessage.id)) {
               messageMapRef.current.set(newMessage.id, newMessage);
-              setMessages(prev => [...prev, newMessage]);
+              setMessages(prev => {
+                // Check if message already exists to prevent duplicates
+                if (prev.some(msg => msg.id === newMessage.id)) {
+                  return prev;
+                }
+                return [...prev, newMessage];
+              });
             }
           } else if (payload.eventType === 'DELETE') {
             messageMapRef.current.delete(payload.old.id);
@@ -115,15 +123,17 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   const sendMessage = useCallback(async (content: string) => {
     if (!threadId) return;
 
+    let optimisticUserMessage: Message | null = null;
+
     try {
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) throw new Error('No authenticated user');
 
-      // Optimistically add the message to the UI
-      const optimisticMessage: Message = {
-        id: crypto.randomUUID(),
+      // Create optimistic user message
+      optimisticUserMessage = {
+        id: `temp-${crypto.randomUUID()}`,
         content,
         thread_id: threadId,
         role: 'user',
@@ -131,10 +141,11 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
         created_at: new Date().toISOString()
       };
       
-      setMessages(prev => [...prev, optimisticMessage]);
+      setMessages(prev => [...prev, optimisticUserMessage!]);
+      setIsGenerating(true);
 
-      // Send to server
-      const { data, error } = await supabase
+      // Send user message to server
+      const { data: userMessageData, error: userMessageError } = await supabase
         .from('messages')
         .insert({
           content,
@@ -145,7 +156,31 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
         .select()
         .single();
 
-      if (error) throw error;
+      if (userMessageError) throw userMessageError;
+
+      // Update messages with real user message
+      if (userMessageData) {
+        setMessages(prev => 
+          prev.map(msg => msg.id === optimisticUserMessage!.id ? userMessageData : msg)
+        );
+      }
+
+      // Generate AI response
+      const aiResponse = await generateResponse(content);
+      
+      // Send AI response to server
+      const { data: aiMessageData, error: aiMessageError } = await supabase
+        .from('messages')
+        .insert({
+          content: aiResponse,
+          thread_id: threadId,
+          role: 'assistant',
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (aiMessageError) throw aiMessageError;
 
       // If this is the first user message, update the thread title
       if (isFirstMessageRef.current && onFirstMessage) {
@@ -153,17 +188,12 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
         isFirstMessageRef.current = false;
       }
 
-      // Replace optimistic message with real one
-      if (data) {
-        setMessages(prev => 
-          prev.map(msg => msg.id === optimisticMessage.id ? data : msg)
-        );
-      }
-
-      return data;
+      return userMessageData;
     } catch (error) {
       // Remove optimistic message on error
-      setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage?.id));
+      if (optimisticUserMessage) {
+        setMessages(prev => prev.filter(msg => msg.id !== optimisticUserMessage?.id));
+      }
       
       console.error('Error sending message:', error);
       await logError(error, 'Send Message');
@@ -173,6 +203,8 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
         variant: 'destructive',
       });
       throw error;
+    } finally {
+      setIsGenerating(false);
     }
   }, [threadId, toast, onFirstMessage, isFirstMessageRef]);
 
@@ -184,6 +216,7 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   return {
     messages,
     loading,
+    isGenerating,
     loadMessages,
     sendMessage
   };

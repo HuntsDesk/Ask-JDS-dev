@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { adminClient } from '@/lib/admin-client';
+import { supabase } from '@/lib/supabase';
 import {
   Card,
   CardContent,
@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 interface AnalyticsData {
   totalUsers: number;
@@ -18,6 +19,7 @@ interface AnalyticsData {
 export function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAnalytics();
@@ -25,21 +27,34 @@ export function Analytics() {
 
   async function loadAnalytics() {
     try {
-      const [
-        { count: totalUsers },
-        { count: totalThreads },
-        { count: totalMessages },
-        { count: activeUsers24h },
-      ] = await Promise.all([
-        adminClient.from('auth.users').select('*', { count: 'exact', head: true }),
-        adminClient.from('threads').select('*', { count: 'exact', head: true }),
-        adminClient.from('messages').select('*', { count: 'exact', head: true }),
-        adminClient.from('auth.users').select('*', {
-          count: 'exact',
-          head: true,
-          filter: 'last_sign_in_at.gt.now()-interval.24h',
-        }),
-      ]);
+      setLoading(true);
+      setError(null);
+
+      // Get total users count using RPC function
+      const { data: totalUsers, error: usersError } = await supabase
+        .rpc('get_total_users');
+
+      if (usersError) throw usersError;
+
+      // Get active users in last 24h using RPC function
+      const { data: activeUsers24h, error: activeUsersError } = await supabase
+        .rpc('get_active_users_24h');
+
+      if (activeUsersError) throw activeUsersError;
+
+      // Get total threads count
+      const { count: totalThreads, error: threadsError } = await supabase
+        .from('threads')
+        .select('*', { count: 'exact', head: true });
+
+      if (threadsError) throw threadsError;
+
+      // Get total messages count
+      const { count: totalMessages, error: messagesError } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true });
+
+      if (messagesError) throw messagesError;
 
       setData({
         totalUsers: totalUsers || 0,
@@ -47,19 +62,44 @@ export function Analytics() {
         totalMessages: totalMessages || 0,
         activeUsers24h: activeUsers24h || 0,
       });
-    } catch (error) {
-      console.error('Failed to load analytics:', error);
+    } catch (err) {
+      console.error('Failed to load analytics:', err);
+      setError('Failed to load analytics data');
     } finally {
       setLoading(false);
     }
   }
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-destructive">
+            {error}
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (!data) {
-    return <div>Failed to load analytics</div>;
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-muted-foreground">
+            No analytics data available
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

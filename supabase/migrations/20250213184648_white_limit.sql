@@ -127,3 +127,23 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO authenticated;
+
+-- Add or update the auth.is_admin function
+CREATE OR REPLACE FUNCTION auth.is_admin(user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM auth.users
+    WHERE id = user_id
+    AND raw_user_meta_data->>'is_admin' = 'true'
+  );
+END;
+$$;
+
+-- Make sure it's accessible
+GRANT EXECUTE ON FUNCTION auth.is_admin(uuid) TO authenticated;

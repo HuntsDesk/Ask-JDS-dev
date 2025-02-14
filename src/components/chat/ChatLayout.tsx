@@ -25,7 +25,8 @@ export function ChatLayout() {
   const {
     messages,
     loading: messagesLoading,
-    sendMessage
+    sendMessage,
+    isGenerating
   } = useMessages(activeThread, (firstMessage) => {
     if (activeThread) {
       updateThreadTitle(activeThread, firstMessage);
@@ -121,6 +122,7 @@ export function ChatLayout() {
               messages={messages}
               onSendMessage={sendMessage}
               isLoading={messagesLoading}
+              isGenerating={isGenerating}
             />
           ) : (
             <AdminDashboard />

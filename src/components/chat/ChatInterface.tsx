@@ -13,6 +13,7 @@ interface ChatInterfaceProps {
   messages: Message[];
   onSendMessage: (content: string) => Promise<void>;
   isLoading?: boolean;
+  isGenerating?: boolean;
 }
 
 interface MessageGroup {
@@ -20,7 +21,13 @@ interface MessageGroup {
   messages: Message[];
 }
 
-export function ChatInterface({ messages, onSendMessage, isLoading = false }: ChatInterfaceProps) {
+export function ChatInterface({ messages, onSendMessage, isLoading = false, isGenerating = false }: ChatInterfaceProps) {
+  console.log('ChatInterface render:', { 
+    isGenerating, 
+    isLoading, 
+    messageCount: messages.length,
+    time: new Date().toISOString()
+  });
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,9 +92,13 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Ch
     };
   }, []);
 
+  useEffect(() => {
+    console.log('isGenerating changed:', isGenerating);
+  }, [isGenerating]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim() && !isLoading) {
+    if (input.trim() && !isLoading && !isGenerating) {
       const message = input.trim();
       setInput('');
       try {
@@ -137,6 +148,9 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Ch
                       <ReactMarkdown 
                         className="prose dark:prose-invert max-w-none text-sm md:text-base break-words [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:mt-4 [&>ul]:mb-4 [&>ul:last-child]:mb-0"
                         components={{
+                          p: ({ children }) => (
+                            <p className="mb-4 last:mb-0">{children}</p>
+                          ),
                           code: ({ node, inline, className, children, ...props }) => {
                             if (inline) {
                               return (
@@ -162,7 +176,7 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Ch
             </div>
           ))}
           
-          {isLoading && (
+          {(isLoading || isGenerating) && (
             <Card className="p-3 md:p-4 bg-secondary">
               <div className="flex items-start gap-3">
                 <Avatar className="w-6 h-6 md:w-8 md:h-8 shrink-0">
@@ -172,7 +186,9 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Ch
                 </Avatar>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm md:text-base">Thinking...</span>
+                  <span className="text-sm md:text-base">
+                    {isGenerating ? 'Thinking...' : 'Loading messages...'}
+                  </span>
                 </div>
               </div>
             </Card>
@@ -195,14 +211,19 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Ch
                 handleSubmit(e);
               }
             }}
+            disabled={isLoading || isGenerating}
           />
           <Button 
             type="submit" 
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || isGenerating || !input.trim()}
             size="icon"
             className="shrink-0"
           >
-            <Send className="w-4 h-4" />
+            {isGenerating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
         </form>
       </div>
