@@ -1,56 +1,52 @@
-import OpenAI from 'openai';
-import type { AIProvider, AISettings } from '@/types/ai';
-import type { Message } from '@/types';
-import { prepareConversationHistory, summarizeConversation } from '../token-utils';
-import { getSystemPrompt } from '../system-prompt';
+import type { AIProvider } from './provider';
+import type { Message } from '@/types/chat';
+import type { AISettings } from '@/types/ai';
+import { callAIRelay } from './relay-utils';
+import { getSystemPrompt } from '@/lib/system-prompt';
 
 export class OpenAIProvider implements AIProvider {
-  private client: OpenAI;
   private settings: AISettings;
 
   constructor(settings: AISettings) {
     this.settings = settings;
-    this.client = new OpenAI({
-      apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-      dangerouslyAllowBrowser: true
+    console.log('🔧 OpenAI Provider Initialized:', {
+      model: settings.model,
+      provider: settings.provider
     });
   }
 
   async generateResponse(prompt: string, threadMessages: Message[] = []): Promise<string> {
-    const startTime = Date.now();
     try {
       const systemPrompt = await getSystemPrompt();
       
-      const selectedMessages = prepareConversationHistory(
-        threadMessages,
-        systemPrompt,
-        prompt
-      );
+      // Format messages correctly for OpenAI
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...threadMessages.map(msg => ({
+          // Ensure role is one of: 'system', 'assistant', 'user'
+          role: msg.role === 'model' ? 'assistant' : 'user',
+          content: msg.content
+        })),
+        { role: 'user', content: prompt }
+      ];
 
-      const completion = await this.client.chat.completions.create({
+      console.log('📤 OpenAI Provider - Sending Request:', {
         model: this.settings.model,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          ...selectedMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
-          { 
-            role: 'user', 
-            content: prompt 
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
+        messagesCount: messages.length,
+        roles: messages.map(m => m.role)
       });
 
-      const response = completion.choices[0].message.content || 'I apologize, but I was unable to generate a response.';
-      return response.replace(/([.!?])\s+(?=[A-Z])/g, '$1\n\n');
+      const data = await callAIRelay(
+        'openai',
+        this.settings.model,
+        prompt,
+        messages
+      );
+
+      console.log('✅ OpenAI Provider - Response Received');
+      return data.choices?.[0]?.message?.content || 'Error retrieving response';
     } catch (error) {
-      console.error('OpenAI API Error:', error);
+      console.error('❌ OpenAI Provider - Error:', error);
       throw error;
     }
   }

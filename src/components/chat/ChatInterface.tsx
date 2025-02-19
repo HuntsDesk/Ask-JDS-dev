@@ -116,63 +116,62 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false, isGe
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1 px-4 py-4 md:px-6" ref={scrollAreaRef}>
         <div className="flex flex-col justify-end min-h-full max-w-3xl mx-auto space-y-6">
-          {messageGroups.map((group, groupIndex) => (
-            <div key={group.date} className="space-y-4">
+          {messageGroups.map(({ date, messages }) => (
+            <div key={date} className="space-y-4">
               <div className="sticky top-0 z-10 flex justify-center">
-                <span className="px-3 py-1 text-xs font-medium text-muted-foreground bg-background/80 rounded-full backdrop-blur-sm">
-                  {group.date}
+                <span className="px-2 py-1 text-xs bg-muted rounded-full">
+                  {date}
                 </span>
               </div>
-              
-              {group.messages.map((message) => (
-                <Card
-                  key={message.id}
-                  className={`p-3 md:p-4 ${
-                    message.role === 'assistant'
-                      ? 'bg-secondary'
-                      : 'bg-primary text-primary-foreground'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <Avatar className="w-6 h-6 md:w-8 md:h-8 shrink-0">
-                      <div className="flex items-center justify-center w-full h-full bg-muted text-xs md:text-base">
-                        {message.role === 'assistant' ? '🤖' : '👤'}
-                      </div>
-                    </Avatar>
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(message.created_at), 'HH:mm')}
-                        </span>
-                      </div>
-                      <ReactMarkdown 
-                        className="prose dark:prose-invert max-w-none text-sm md:text-base break-words [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:mt-4 [&>ul]:mb-4 [&>ul:last-child]:mb-0"
-                        components={{
-                          p: ({ children }) => (
-                            <p className="mb-4 last:mb-0">{children}</p>
-                          ),
-                          code: ({ node, inline, className, children, ...props }) => {
-                            if (inline) {
+              <div className="space-y-4">
+                {messages.map((message, index) => (
+                  <Card 
+                    key={`${message.id}-${index}`}
+                    className={`p-3 md:p-4 ${
+                      message.role === 'assistant' ? 'bg-secondary' : ''
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar className="w-6 h-6 md:w-8 md:h-8 shrink-0">
+                        <div className="flex items-center justify-center w-full h-full bg-muted text-xs md:text-base">
+                          {message.role === 'assistant' ? '🤖' : '👤'}
+                        </div>
+                      </Avatar>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(message.created_at), 'HH:mm')}
+                          </span>
+                        </div>
+                        <ReactMarkdown 
+                          className="prose dark:prose-invert max-w-none text-sm md:text-base break-words [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:mt-4 [&>ul]:mb-4 [&>ul:last-child]:mb-0"
+                          components={{
+                            p: ({ children }) => (
+                              <p className="mb-4 last:mb-0">{children}</p>
+                            ),
+                            code: ({ node, inline, className, children, ...props }) => {
+                              if (inline) {
+                                return (
+                                  <code className="px-1 py-0.5 rounded-md bg-muted font-mono text-sm" {...props}>
+                                    {children}
+                                  </code>
+                                );
+                              }
                               return (
-                                <code className="px-1 py-0.5 rounded-md bg-muted font-mono text-sm" {...props}>
-                                  {children}
-                                </code>
+                                <pre className="p-4 rounded-lg bg-muted font-mono text-sm overflow-x-auto">
+                                  <code {...props}>{children}</code>
+                                </pre>
                               );
                             }
-                            return (
-                              <pre className="p-4 rounded-lg bg-muted font-mono text-sm overflow-x-auto">
-                                <code {...props}>{children}</code>
-                              </pre>
-                            );
-                          }
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))}
+              </div>
             </div>
           ))}
           

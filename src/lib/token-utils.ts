@@ -1,4 +1,4 @@
-import type { Message } from '@/types';
+import type { Message, Content, Part } from '@/types';
 
 // Constants
 export const MAX_TOKENS = 8192;  // Maximum context window
@@ -19,11 +19,11 @@ export function countTokens(text: string): number {
 export function prepareConversationHistory(
   messages: Message[],
   systemPrompt: string,
-  newPrompt: string
-): Message[] {
+  prompt: string
+): Content[] {
   // Count system prompt tokens
   const systemTokens = countTokens(systemPrompt);
-  const newPromptTokens = countTokens(newPrompt);
+  const newPromptTokens = countTokens(prompt);
   let availableTokens = TOKEN_LIMIT - systemTokens - newPromptTokens;
 
   // Tokenize all messages
@@ -49,7 +49,10 @@ export function prepareConversationHistory(
     totalTokens += tokens;
   }
 
-  return selectedMessages;
+  return selectedMessages.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }] as Part[]
+  }));
 }
 
 export function summarizeConversation(messages: Message[]): string {

@@ -1,3 +1,5 @@
+import type { Content, Part } from '@google/generative-ai';
+
 export interface User {
   id: string;
   email: string;
@@ -12,12 +14,15 @@ export interface Thread {
 }
 
 export interface Message {
-  id: string;
-  content: string;
+  id?: string;
   role: 'user' | 'assistant';
-  created_at: string;
-  thread_id: string;
-  user_id: string;
+  content: string;
+  created_at?: string;
+}
+
+export interface GeminiMessage extends Content {
+  role: 'user' | 'model';
+  parts: Part[];
 }
 
 export interface ErrorLog {

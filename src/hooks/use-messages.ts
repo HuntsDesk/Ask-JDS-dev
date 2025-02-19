@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Message } from '@/types';
+import type { Message } from '@/types';
 import { useToast } from './use-toast';
 import { logError } from '@/lib/supabase';
-import { generateResponse } from '@/lib/openai';
+import { createAIProvider } from '@/lib/ai/provider-factory';
+import { useSettings } from './use-settings';
 
 export function useMessages(threadId: string | null, onFirstMessage?: (message: string) => void) {
+  const { settings } = useSettings();
+  const aiProvider = useRef<AIProvider | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -13,6 +16,13 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   const loadAttemptRef = useRef(0);
   const messageMapRef = useRef<Map<string, Message>>(new Map());
   const isFirstMessageRef = useRef(true);
+
+  // Initialize AI provider when settings change
+  useEffect(() => {
+    if (settings) {
+      aiProvider.current = createAIProvider(settings);
+    }
+  }, [settings]);
 
   const loadMessages = useCallback(async (retryCount = 0) => {
     if (!threadId) {
@@ -121,7 +131,7 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   }, [threadId]);
 
   const sendMessage = useCallback(async (content: string) => {
-    if (!threadId) return;
+    if (!threadId || !aiProvider.current) return;
 
     let optimisticUserMessage: Message | null = null;
 
@@ -165,8 +175,8 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
         );
       }
 
-      // Generate AI response with conversation history
-      const aiResponse = await generateResponse(content, messages);
+      // Generate AI response with conversation history using the provider
+      const aiResponse = await aiProvider.current.generateResponse(content, messages);
       
       // Send AI response to server
       const { data: aiMessageData, error: aiMessageError } = await supabase

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save } from 'lucide-react';
-import { getSystemPromptHistory, updateSystemPrompt } from '@/lib/openai';
+import { getSystemPromptHistory, updateSystemPrompt } from '@/lib/system-prompt';
 
 export function SystemPrompt() {
   const [prompt, setPrompt] = useState('');

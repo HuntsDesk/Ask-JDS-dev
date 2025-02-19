@@ -32,6 +32,7 @@ export function AISettingsForm() {
       return;
     }
 
+    console.log('Current AI Settings:', data);
     setSettings(data);
     setLoading(false);
   }
