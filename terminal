@@ -1,0 +1,2 @@
+rm src/components/TestAuth.tsx
+rm src/components/SupabaseTest.tsx 
