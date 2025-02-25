@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { SignInPage } from './SignInPage';
+import { useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 
 export function AuthPage() {
@@ -13,5 +12,9 @@ export function AuthPage() {
     }
   }, [user, navigate]);
 
-  return <SignInPage />;
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Outlet />
+    </div>
+  );
 } 

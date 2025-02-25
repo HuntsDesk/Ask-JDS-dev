@@ -1,4 +1,4 @@
-import type { Message, Content, Part } from '@/types';
+import type { Message } from '@/types';
 
 // Constants
 export const MAX_TOKENS = 8192;  // Maximum context window
@@ -11,6 +11,11 @@ interface TokenizedMessage {
   tokens: number;
 }
 
+interface GeminiMessage {
+  role: 'user' | 'model';
+  parts: Array<{ text: string }>;
+}
+
 // Simple token estimation (4 characters ≈ 1 token)
 export function countTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -20,7 +25,7 @@ export function prepareConversationHistory(
   messages: Message[],
   systemPrompt: string,
   prompt: string
-): Content[] {
+): GeminiMessage[] {
   // Count system prompt tokens
   const systemTokens = countTokens(systemPrompt);
   const newPromptTokens = countTokens(prompt);
@@ -51,7 +56,7 @@ export function prepareConversationHistory(
 
   return selectedMessages.map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }] as Part[]
+    parts: [{ text: msg.content }]
   }));
 }
 
@@ -62,4 +67,4 @@ export function summarizeConversation(messages: Message[]): string {
     .join('\n');
   
   return `Previous conversation summary:\n${summary}`;
-} 
+}

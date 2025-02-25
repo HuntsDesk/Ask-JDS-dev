@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { setUserAsAdmin, removeUserAdmin } from '@/lib/admin-client';
+import { setUserAsAdmin, removeUserAdmin, getAllUsers } from '@/lib/admin-client';
 import {
   Table,
   TableBody,
@@ -11,36 +11,36 @@ import {
 import { Button } from '@/components/ui/button';
 import { Shield, ShieldOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth';
 
-interface User {
+interface SupabaseUser {
   id: string;
   email: string;
   created_at: string;
+  last_sign_in_at: string | null;
   user_metadata: {
     is_admin?: boolean;
   };
 }
 
 export function UserManager() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<SupabaseUser[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const loadUsers = useCallback(async () => {
     try {
-      const { data, error: loadError } = await supabase.from('users').select('*');
-      if (loadError) {
-        console.error('Failed to load users:', loadError);
-        toast({
-          title: 'Error',
-          description: 'Failed to load users'
-        });
-        return;
-      }
+      setLoading(true);
+      const data = await getAllUsers();
       setUsers(data || []);
     } catch (err) {
       console.error('Error loading users:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to load users',
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
     }
@@ -76,6 +76,10 @@ export function UserManager() {
     return <div>Loading...</div>;
   }
 
+  if (!user?.isAdmin) {
+    return <div>Access denied. Admin privileges required.</div>;
+  }
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -105,7 +109,7 @@ export function UserManager() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleToggleAdmin(user.id, user.user_metadata?.is_admin)}
+                  onClick={() => handleToggleAdmin(user.id, user.user_metadata?.is_admin || false)}
                 >
                   {user.user_metadata?.is_admin ? (
                     <ShieldOff className="h-4 w-4" />

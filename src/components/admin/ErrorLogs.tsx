@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getErrorLogs } from '@/lib/admin-client';
+import { getErrorLogs, markErrorAsInvestigated } from '@/lib/admin-client';
 import {
   Table,
   TableBody,
@@ -13,7 +13,6 @@ import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { ErrorLog } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/lib/supabase';
 
 export function ErrorLogs() {
   const [logs, setLogs] = useState<ErrorLog[]>([]);
@@ -41,17 +40,21 @@ export function ErrorLogs() {
   }, [loadLogs]);
 
   const handleInvestigate = async (id: string) => {
-    const { error } = await supabase
-      .from('error_logs')
-      .update({ investigated: true })
-      .eq('id', id);
-    
-    if (error) {
+    try {
+      await markErrorAsInvestigated(id);
+      toast({
+        title: 'Success',
+        description: 'Error marked as investigated'
+      });
+      await loadLogs();
+    } catch (error) {
       console.error('Failed to mark as investigated:', error);
-      return;
+      toast({
+        title: 'Error',
+        description: 'Failed to mark error as investigated',
+        variant: 'destructive'
+      });
     }
-    
-    await loadLogs();
   };
 
   if (loading) {

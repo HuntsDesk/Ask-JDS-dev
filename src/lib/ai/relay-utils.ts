@@ -9,7 +9,7 @@ export async function callAIRelay(
   provider: string, 
   model: string, 
   prompt: string, 
-  messages: unknown
+  messages: Array<{ role: string; content: string }>
 ): Promise<AIResponse> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -26,25 +26,51 @@ export async function callAIRelay(
       messages: messages ?? []
     };
 
+    const baseUrl = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
+    const url = `${baseUrl}/functions/v1/chat-relay`;
+
     console.log('🚀 Sending AI Relay Request:', {
-      url: `${supabase.supabaseUrl}/functions/v1/chat-relay`,
+      url,
       provider,
       model,
       promptLength: prompt.length,
-      messagesCount: requestBody.messages.length,
-      body: JSON.stringify(requestBody, null, 2)
+      messagesCount: messages?.length || 0
     });
 
-    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/chat-relay`, {
-      method: 'POST',
+    const response = await fetch(url, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(requestBody)
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      // Clone the response before parsing to be able to get the text if parsing fails
+      const responseClone = response.clone();
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // If JSON parsing fails, get the raw text and log it
+        const responseText = await responseClone.text();
+        console.error('❌ JSON Parse Error:', {
+          error: jsonError,
+          responseText: responseText.substring(0, 500) + (responseText.length > 500 ? '...' : '')
+        });
+        
+        // Check for network connection issues
+        if (responseText.includes("Network connection lost")) {
+          throw new Error("Network connection to AI service was lost. Please try again.");
+        }
+        
+        throw jsonError;
+      }
+    } catch (error) {
+      console.error('❌ Response Parsing Error:', error);
+      throw error;
+    }
 
     if (!response.ok) {
       console.error('❌ AI Relay Error:', {
@@ -63,9 +89,9 @@ export async function callAIRelay(
     return data;
   } catch (error) {
     console.error('🔥 AI Relay Fatal Error:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     throw error;
   }

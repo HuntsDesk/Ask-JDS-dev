@@ -1,1 +1,1 @@
-export { AuthProvider }; 
+export { AuthProvider } from '@/lib/auth';

@@ -1,77 +1,41 @@
 import { supabase } from './supabase';
-import { generateEmbedding, getChatCompletion } from './openai';
 
-async function logError(errorMessage: string, errorStack: string | null = null) {
-  await supabase.from('error_logs').insert([
-    { message: errorMessage, stack_trace: errorStack }
-  ]);
+interface SearchResult {
+  id: string;
+  content: string;
+  similarity: number;
 }
 
-async function getActiveSystemPrompt() {
+export async function searchLegalDocuments(query: string): Promise<SearchResult[]> {
   try {
-    const { data, error } = await supabase
-      .from('system_prompts')
-      .select('content')
-      .eq('is_active', true)
-      .single();
-
-    if (error) {
-      console.error('Error fetching system prompt:', error);
-      await logError('Error fetching system prompt', error.message);
-      return `You are a tutor for law school students and aspiring bar-takers. 
-You only provide responses from this perspective. You are NOT providing legal advice. 
-
-Use the following legal context to answer the user's question. If the context doesn't contain relevant information, provide a general response based on your knowledge. 
-
-Never make up a response. If you do not know, clearly say: "I do not know."
-
-Context:
-\${context}`;
-    }
-
-    return data.content;
-  } catch (error) {
-    console.error('Unexpected error fetching system prompt:', error);
-    await logError('Unexpected error fetching system prompt', error?.toString());
-    return null;
-  }
-}
-
-export async function searchLegalDocuments(query: string) {
-  try {
-    const embedding = await generateEmbedding(query);
-
-    const { data, error } = await supabase.rpc('search_jds_library', {
-      query_embedding: embedding,
+    const { data, error } = await supabase.rpc('search_documents', {
+      query_text: query,
       match_threshold: 0.5,
       match_count: 3
     });
 
     if (error) {
       console.error('Error searching legal documents:', error);
-      await logError('Error searching legal documents', error.message);
+      await logError(error, 'Error searching legal documents');
       return [];
     }
 
     return data || [];
   } catch (error) {
     console.error('Unexpected error searching legal documents:', error);
-    await logError('Unexpected error searching legal documents', error?.toString());
+    await logError(error, 'Unexpected error searching legal documents');
     return [];
   }
 }
 
 export async function addLegalDocument(title: string, content: string, category: string, tags: string[] = []) {
   try {
-    const embedding = await generateEmbedding(content);
-
     const { data, error } = await supabase
       .from('jds_library')
       .insert([
         {
           title,
           content,
-          embedding,
           category,
           tags
         }
@@ -81,38 +45,86 @@ export async function addLegalDocument(title: string, content: string, category:
 
     if (error) {
       console.error('Error adding legal document:', error);
-      await logError('Error adding legal document', error.message);
+      await logError(error, 'Error adding legal document');
       return null;
     }
 
     return data;
   } catch (error) {
     console.error('Unexpected error adding legal document:', error);
-    await logError('Unexpected error adding legal document', error?.toString());
+    await logError(error, 'Unexpected error adding legal document');
     return null;
   }
 }
 
 export async function getAIResponse(query: string, context: string) {
   try {
-    const systemPrompt = await getActiveSystemPrompt();
+    const systemPrompt = await getSystemPrompt();
     const promptWithContext = systemPrompt?.replace('${context}', context || "No relevant legal documents were found.") || '';
 
-    const response = await getChatCompletion([
-      {
-        role: 'system',
-        content: promptWithContext,
-      },
-      {
-        role: 'user',
-        content: query,
-      },
-    ]);
+    const { data, error } = await supabase.functions.invoke('chat', {
+      body: {
+        messages: [
+          {
+            role: 'system',
+            content: promptWithContext,
+          },
+          {
+            role: 'user',
+            content: query,
+          },
+        ]
+      }
+    });
 
-    return response || 'I do not know. The available legal materials do not cover this question.';
+    if (error) throw error;
+    return data?.response || 'I do not know. The available legal materials do not cover this question.';
   } catch (error) {
     console.error('Error getting AI response:', error);
-    await logError('Error getting AI response', error?.toString());
+    await logError(error, 'Error getting AI response');
     return 'There was an error processing your request. Please try again.';
+  }
+}
+
+async function getSystemPrompt(): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('system_prompts')
+      .select('content')
+      .eq('is_active', true)
+      .single();
+
+    if (error) {
+      console.error('Error fetching system prompt:', error);
+      await logError(error, 'Error fetching system prompt');
+      return 'You are a tutor for law school students and aspiring bar-takers.';
+    }
+
+    return data.content;
+  } catch (error) {
+    console.error('Unexpected error fetching system prompt:', error);
+    await logError(error, 'Unexpected error fetching system prompt');
+    return null;
+  }
+}
+
+async function logError(error: unknown, context: string) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const stackTrace = error instanceof Error ? error.stack : undefined;
+
+  try {
+    const { error: insertError } = await supabase
+      .from('error_logs')
+      .insert([{
+        message: `${context}: ${errorMessage}`,
+        stack_trace: stackTrace,
+        investigated: false
+      }]);
+
+    if (insertError) {
+      console.error('Failed to log error:', insertError);
+    }
+  } catch (err) {
+    console.error('Failed to log error:', err);
   }
 }

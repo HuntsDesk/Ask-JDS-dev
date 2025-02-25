@@ -29,7 +29,7 @@ export function HomePage() {
     {
       icon: Shield,
       title: "No Judgment Zone",
-      description: "We won't ask why you're learning Crim Pro at 2 AM.",
+      description: "We won&apos;t ask why you&apos;re learning Crim Pro at 2 AM.",
       color: "text-orange-500",
       gradient: "from-orange-500/20 to-orange-500/5"
     },
@@ -43,7 +43,7 @@ export function HomePage() {
     {
       icon: GraduationCap,
       title: "Trained on Real Law Student Resources",
-      description: "Because bar exam prep shouldn't feel like deciphering the Rosetta Stone.",
+      description: "Because bar exam prep shouldn&apos;t feel like deciphering the Rosetta Stone.",
       color: "text-green-500",
       gradient: "from-green-500/20 to-green-500/5"
     },
@@ -59,14 +59,14 @@ export function HomePage() {
   const questions = [
     {
       icon: Lightbulb,
-      text: "Explain promissory estoppel like I'm five.",
+      text: "Explain promissory estoppel like I&apos;m five.",
       category: "Concept Clarification",
       color: "text-orange-500",
       bgColor: "bg-orange-500/5"
     },
     {
       icon: HelpCircle,
-      text: "What's the difference between negligence and strict liability?",
+      text: "What&apos;s the difference between negligence and strict liability?",
       category: "Legal Distinctions",
       color: "text-blue-500",
       bgColor: "bg-blue-500/5"
@@ -157,7 +157,7 @@ export function HomePage() {
           {/* Hero Content */}
           <div className="text-center mt-16">
             <h1 className="text-5xl font-bold text-black mb-8">
-              The <i className="text-[#F37022]">Law Study Buddy</i> that won't judge you for procrastinating.
+              The <i className="text-[#F37022]">Law Study Buddy</i> that won&apos;t judge you for procrastinating.
             </h1>
 
             <h2 className="text-3xl font-bold text-black mb-4">
@@ -165,7 +165,7 @@ export function HomePage() {
             </h2>
 
             <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-              Welcome to Ask JDS, where you can throw your burning law school and bar prep questions at a friendly AI Law Nerd who won't shame you for forgetting the rule against perpetuities (again).
+              Welcome to Ask JDS, where you can throw your burning law school and bar prep questions at a friendly AI Law Nerd who won&apos;t shame you for forgetting the rule against perpetuities (again).
             </p>
 
             <button 
@@ -187,7 +187,7 @@ export function HomePage() {
             <div className="bg-white p-8 rounded-xl shadow-sm">
               <MessageSquare className="w-12 h-12 text-[#00178E] mb-4" />
               <h3 className="text-xl font-semibold mb-4 text-[#F37022]">Ask a Question</h3>
-              <p className="text-gray-600">Type in your legal query. Bar prep, case law, general despair—it's all fair game.</p>
+              <p className="text-gray-600">Type in your legal query. Bar prep, case law, general despair—it&apos;s all fair game.</p>
             </div>
             <div className="bg-white p-8 rounded-xl shadow-sm">
               <Brain className="w-12 h-12 text-[#00178E] mb-4" />
@@ -197,7 +197,7 @@ export function HomePage() {
             <div className="bg-white p-8 rounded-xl shadow-sm">
               <Rocket className="w-12 h-12 text-[#00178E] mb-4" />
               <h3 className="text-xl font-semibold mb-4 text-[#F37022]">Pass Your Exam</h3>
-              <p className="text-gray-600">We can't guarantee an A, but we can make sure you at least sound like you know what you're talking about.</p>
+              <p className="text-gray-600">We can&apos;t guarantee an A, but we can make sure you at least sound like you know what you&apos;re talking about.</p>
             </div>
           </div>
         </div>
@@ -210,7 +210,7 @@ export function HomePage() {
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-black mb-4">Why Use Ask JDS?</h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Your personal legal study companion that's always ready to help, without the hefty price tag.
+              Your personal legal study companion that&apos;s always ready to help, without the hefty price tag.
             </p>
           </div>
           
@@ -248,7 +248,7 @@ export function HomePage() {
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-black mb-4">What Can You Ask?</h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              From basic concepts to existential crises, we've got you covered.
+              From basic concepts to existential crises, we&apos;ve got you covered.
             </p>
           </div>
           <div className="grid md:grid-cols-2 gap-8">
@@ -258,15 +258,15 @@ export function HomePage() {
                 className={`${question.bgColor} p-6 rounded-xl transition-all duration-300 hover:shadow-lg group`}
               >
                 <div className="flex items-start space-x-4">
-                  <div className={`${question.color} bg-white p-2 rounded-md`}>
-                    <question.icon className="w-5 h-5" />
+                  <div className={`${question.color} p-3 rounded-lg`}>
+                    <question.icon className="w-6 h-6" />
                   </div>
                   <div>
-                    <span className={`text-2xl font-semibold ${question.color} mb-2 block`}>
-                      {question.category}
-                    </span>
-                    <p className="text-lg text-gray-600 group-hover:text-gray-700 transition-colors">
+                    <p className="text-lg font-semibold text-[#00178E] mb-2">
                       {question.text}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {question.category}
                     </p>
                   </div>
                 </div>
@@ -275,30 +275,6 @@ export function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* CTA */}
-      <section className="py-20 bg-[#00178E]">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">Sign Up Now</h2>
-          <p className="text-xl text-white/90 mb-8">
-            Skip the overpriced tutors and questionable Reddit advice—Ask JDS is your $5/month legal survival guide.
-          </p>
-          <button 
-            onClick={() => navigate('/auth/signup')}
-            className="bg-[#F37022] text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-[#F37022]/90 transition-colors inline-flex items-center"
-          >
-            Join Now for $5/Month
-            <ArrowRight className="ml-2 w-5 h-5" />
-          </button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 text-center">
-        <p className="text-lg font-semibold text-[#00178E]">
-          Ask JDS. Smarter than your group chat, cheaper than a tutor.
-        </p>
-      </footer>
     </div>
   );
 }

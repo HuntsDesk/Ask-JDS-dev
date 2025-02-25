@@ -5,34 +5,38 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 
-export function SignInForm() {
+export function SignUpForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with email:', email);
     setIsLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
+      console.log('Calling signUp with email:', email);
+      const { error } = await signUp(email, password);
+      console.log('SignUp response error:', error);
+      
       if (error) throw error;
       
-      // Change navigation to /chat instead of /
-      setTimeout(() => {
-        navigate('/chat', { replace: true });
-      }, 100);
+      toast({
+        title: 'Success',
+        description: 'Please check your email to verify your account.',
+      });
       
+      navigate('/auth/signin');
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('Sign up error:', error);
       toast({
         title: 'Error',
-        description: 'Invalid email or password',
+        description: 'Failed to create account. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -40,10 +44,24 @@ export function SignInForm() {
     }
   };
 
+  const handleButtonClick = () => {
+    console.log('Button clicked directly');
+    if (!email || !password) {
+      console.log('Email or password is empty');
+      toast({
+        title: 'Error',
+        description: 'Please enter both email and password',
+        variant: 'destructive',
+      });
+      return;
+    }
+    handleSubmit(new Event('click') as React.FormEvent<HTMLFormElement>);
+  };
+
   return (
     <Card className="w-full max-w-md mx-auto mt-8">
       <CardHeader>
-        <CardTitle>Sign In</CardTitle>
+        <CardTitle>Sign Up</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -73,44 +91,28 @@ export function SignInForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
               disabled={isLoading}
             />
           </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Checkbox id="remember" />
-              <label
-                htmlFor="remember"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Remember me
-              </label>
-            </div>
-            <Link
-              to="/auth/forgot-password"
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
           <Button
-            type="submit"
+            type="button"
             className="w-full"
             disabled={isLoading}
+            onClick={handleButtonClick}
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? 'Signing up...' : 'Sign Up'}
           </Button>
         </form>
       </CardContent>
       <CardFooter className="flex justify-center">
         <p className="text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
-          <Link to="/auth/signup" className="text-primary hover:underline">
-            Sign up
+          Already have an account?{' '}
+          <Link to="/auth/signin" className="text-primary hover:underline">
+            Sign in
           </Link>
         </p>
       </CardFooter>
     </Card>
   );
-} 
+}

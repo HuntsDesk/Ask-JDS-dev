@@ -15,6 +15,9 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
   const isFirstMessageRef = useRef(true);
+  const { user } = supabase.auth.getUser();
+  // Add a ref to track message IDs we've already added
+  const addedMessageIds = useRef(new Set<string>());
 
   // Initialize AI provider when settings change
   useEffect(() => {
@@ -31,6 +34,8 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
     }
 
     setLoading(true);
+    // Clear the set of added message IDs when loading a new thread
+    addedMessageIds.current.clear();
 
     try {
       const { data, error } = await supabase
@@ -39,26 +44,28 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       
-      if (!data) {
-        setMessages([]);
-        return;
-      }
+      const messagesList = data || [];
+      
+      // Add all loaded message IDs to our tracking set
+      messagesList.forEach(msg => {
+        addedMessageIds.current.add(msg.id);
+      });
+      
+      setMessages(messagesList);
 
-      setMessages(data);
-
-      // Safely handle first message callback
-      if (data.length > 0 && onFirstMessage && isFirstMessageRef.current) {
-        const firstUserMessage = data.find(m => !m.is_bot);
+      // Handle first message callback if needed
+      if (messagesList.length > 0 && onFirstMessage && isFirstMessageRef.current) {
+        const firstUserMessage = messagesList.find(m => m.role === 'user');
         if (firstUserMessage) {
           onFirstMessage(firstUserMessage.content);
           isFirstMessageRef.current = false;
         }
       }
     } catch (error) {
+      console.error('Error loading messages:', error);
+      await logError(error, 'Load Messages');
       toast({
         title: 'Error',
         description: 'Failed to load messages. Please try again.',
@@ -72,31 +79,52 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   // Load messages when thread changes
   useEffect(() => {
     loadMessages();
+    // Reset isFirstMessageRef when threadId changes
+    isFirstMessageRef.current = true;
   }, [threadId, loadMessages]);
 
   // Subscribe to real-time updates
   useEffect(() => {
-    if (!threadId) return;
-    
-    const subscription = supabase
-      .channel(`messages:${threadId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'messages',
-        filter: `thread_id=eq.${threadId}`
-      }, () => {
-        loadMessages();  // Reload messages when we get an update
-      })
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [threadId, loadMessages]);
+    if (threadId) {
+      // Set up real-time subscription for new messages
+      const channel = supabase
+        .channel(`messages:thread_id=eq.${threadId}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `thread_id=eq.${threadId}`
+        }, (payload) => {
+          const newMessageId = payload.new.id;
+          
+          // Only add the message if we haven't already added it
+          if (!addedMessageIds.current.has(newMessageId)) {
+            // Double-check that this message isn't already in the list
+            // This prevents duplicate messages with the same ID
+            setMessages(prev => {
+              // Check if message with this ID already exists
+              const exists = prev.some(msg => msg.id === newMessageId);
+              if (exists) {
+                return prev; // Don't add it again
+              }
+              
+              // Add the message ID to our tracking set
+              addedMessageIds.current.add(newMessageId);
+              return [...prev, payload.new as Message];
+            });
+          }
+        })
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [threadId]);
 
   const sendMessage = useCallback(async (content: string) => {
-    if (!threadId || !aiProvider.current) return;
+    if (!threadId || !aiProvider.current) return null;
+    if (!content.trim()) return null;
 
     let optimisticUserMessage: Message | null = null;
 
@@ -113,10 +141,10 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
         thread_id: threadId,
         role: 'user',
         user_id: user.id,
-        created_at: new Date().toISOString(),
-        is_bot: false
+        created_at: new Date().toISOString()
       };
       
+      // Add optimistic message to UI
       setMessages(prev => [...prev, optimisticUserMessage!]);
       setIsGenerating(true);
 
@@ -134,14 +162,31 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
 
       if (userMessageError) throw userMessageError;
 
-      // Update messages with real user message
+      // Update messages with real user message and track its ID
       if (userMessageData) {
-        setMessages(prev => 
-          prev.map(msg => msg.id === optimisticUserMessage!.id ? userMessageData : msg)
-        );
+        // Add the message ID to our tracking set
+        addedMessageIds.current.add(userMessageData.id);
+        
+        // Replace the optimistic message with the real one, or skip if it already exists
+        setMessages(prev => {
+          // Check if we already have this message (not just the optimistic one)
+          const alreadyExists = prev.some(msg => 
+            msg.id === userMessageData.id && msg.id !== optimisticUserMessage!.id
+          );
+          
+          if (alreadyExists) {
+            // If it exists (not as the optimistic message), remove the optimistic one
+            return prev.filter(msg => msg.id !== optimisticUserMessage!.id);
+          }
+          
+          // Otherwise replace the optimistic message with the real one
+          return prev.map(msg => 
+            msg.id === optimisticUserMessage!.id ? userMessageData : msg
+          );
+        });
       }
 
-      // Generate AI response with conversation history using the provider
+      // Generate AI response with conversation history
       const aiResponse = await aiProvider.current.generateResponse(content, messages);
       
       // Send AI response to server
@@ -164,9 +209,20 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
         isFirstMessageRef.current = false;
       }
 
-      // Use aiMessageData
+      // Add AI message to UI and track its ID
       if (aiMessageData) {
-        setMessages(prev => [...prev, aiMessageData]);
+        // Check if this message is already in the list before adding it
+        setMessages(prev => {
+          // Check if message with this ID already exists
+          const exists = prev.some(msg => msg.id === aiMessageData.id);
+          if (exists) {
+            return prev; // Don't add it again
+          }
+          
+          // Add the message ID to our tracking set
+          addedMessageIds.current.add(aiMessageData.id);
+          return [...prev, aiMessageData];
+        });
       }
 
       return userMessageData;
@@ -178,21 +234,28 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
       
       console.error('Error sending message:', error);
       await logError(error, 'Send Message');
+      
+      // Display more specific error messages
+      let errorMessage = 'Failed to send message. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes("Network connection to AI service was lost")) {
+          errorMessage = "Network connection to AI service was lost. Please try again.";
+        } else if (error.message.includes("Unable to generate AI response")) {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: 'Error',
-        description: 'Failed to send message. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
-      throw error;
+      return null;
     } finally {
       setIsGenerating(false);
     }
-  }, [threadId, messages, toast, onFirstMessage, isFirstMessageRef]);
-
-  // Reset isFirstMessageRef when threadId changes
-  useEffect(() => {
-    isFirstMessageRef.current = true;
-  }, [threadId]);
+  }, [threadId, messages, toast, onFirstMessage]);
 
   return {
     messages,

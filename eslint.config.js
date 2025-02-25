@@ -11,4 +11,11 @@ export default [
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
+  {
+    rules: {
+      // Disable rule that requires React to be in scope for JSX
+      "react/react-in-jsx-scope": "off",
+      // Add other rule overrides as needed
+    }
+  }
 ];

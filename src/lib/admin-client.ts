@@ -39,12 +39,43 @@ function checkRateLimit(userId: string): boolean {
   return true;
 }
 
+// Helper function to check if the current user is an admin
+async function isCurrentUserAdmin(): Promise<boolean> {
+  try {
+    // Try to use the secure RPC function
+    const { data, error } = await supabase.rpc('is_admin');
+    
+    if (!error && data !== null) {
+      return data;
+    }
+    
+    if (error) {
+      console.error('Error checking admin status with RPC:', error);
+      
+      // Fall back to checking the user's metadata
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.user?.user_metadata?.is_admin === true;
+    }
+    
+    return false;
+  } catch (err) {
+    console.error('Failed to check admin status:', err);
+    return false;
+  }
+}
+
 // Admin helper functions with rate limiting and input validation
 export async function getAllUsers() {
   try {
     const { data: { session } } = await supabase.auth.getSession(); // Use main client
     if (!session?.user) {
       throw new Error('No authenticated user found');
+    }
+    
+    // Check if the user is an admin
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+      throw new Error('Admin privileges required');
     }
     
     console.log('Current user:', session.user);
@@ -74,12 +105,26 @@ export async function setUserAsAdmin(userId: string) {
 
   const { data: { session } } = await supabase.auth.getSession(); // Use main client
   
-  if (!session?.user || !checkRateLimit(session.user.id)) {
+  if (!session?.user) {
+    throw new Error('No authenticated user found');
+  }
+  
+  // Check if the user is an admin
+  const isAdmin = await isCurrentUserAdmin();
+  if (!isAdmin) {
+    throw new Error('Admin privileges required');
+  }
+  
+  if (!checkRateLimit(session.user.id)) {
     throw new Error('Rate limit exceeded. Please try again later.');
   }
 
   const { error } = await adminClient.rpc('upgrade_to_admin', { user_id: userId });
-  if (error) throw error;
+  
+  if (error) {
+    console.error('Error setting user as admin:', error);
+    throw error;
+  }
 }
 
 export async function removeUserAdmin(userId: string) {
@@ -89,12 +134,26 @@ export async function removeUserAdmin(userId: string) {
 
   const { data: { session } } = await supabase.auth.getSession(); // Use main client
   
-  if (!session?.user || !checkRateLimit(session.user.id)) {
+  if (!session?.user) {
+    throw new Error('No authenticated user found');
+  }
+  
+  // Check if the user is an admin
+  const isAdmin = await isCurrentUserAdmin();
+  if (!isAdmin) {
+    throw new Error('Admin privileges required');
+  }
+  
+  if (!checkRateLimit(session.user.id)) {
     throw new Error('Rate limit exceeded. Please try again later.');
   }
 
   const { error } = await adminClient.rpc('revoke_admin', { user_id: userId });
-  if (error) throw error;
+  
+  if (error) {
+    console.error('Error removing user admin:', error);
+    throw error;
+  }
 }
 
 export async function getErrorLogs() {
@@ -102,6 +161,12 @@ export async function getErrorLogs() {
     const { data: { session } } = await supabase.auth.getSession(); // Use main client
     if (!session?.user) {
       throw new Error('No authenticated user found');
+    }
+    
+    // Check if the user is an admin
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+      throw new Error('Admin privileges required');
     }
     
     console.log('Current user:', session.user);
@@ -131,11 +196,24 @@ export async function markErrorAsInvestigated(errorId: string) {
 
   const { data: { session } } = await supabase.auth.getSession(); // Use main client
   
-  if (!session?.user || !checkRateLimit(session.user.id)) {
+  if (!session?.user) {
+    throw new Error('No authenticated user found');
+  }
+  
+  // Check if the user is an admin
+  const isAdmin = await isCurrentUserAdmin();
+  if (!isAdmin) {
+    throw new Error('Admin privileges required');
+  }
+  
+  if (!checkRateLimit(session.user.id)) {
     throw new Error('Rate limit exceeded. Please try again later.');
   }
 
   const { error } = await adminClient.rpc('mark_error_investigated', { error_id: errorId });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error marking error as investigated:', error);
+    throw error;
+  }
 }

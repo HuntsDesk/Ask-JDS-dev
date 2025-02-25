@@ -4,13 +4,9 @@ import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isThisWeek, isThisMonth } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  ChevronLeft, 
   ChevronRight, 
-  Plus, 
   LogOut, 
   Trash2, 
-  Settings, 
-  Edit2,
   MessageSquare,
   Shield,
   PlusCircle,
@@ -23,7 +19,6 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Input } from '@/components/ui/input';
-import type { Thread } from '@/types';
 
 interface SidebarProps {
   setActiveTab: (id: string | null) => void;

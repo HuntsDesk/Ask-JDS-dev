@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '../supabase';
 import type { AIProvider } from './provider';
 import { OpenAIProvider } from './openai-provider';
-import { GoogleAIProvider } from './google-provider';
+import { GeminiProvider } from './gemini-provider';
 
 export function useAIProvider() {
   const providerRef = useRef<AIProvider | null>(null);
@@ -27,8 +27,10 @@ export function useAIProvider() {
             providerRef.current = new OpenAIProvider(settings);
             break;
           case 'google':
-            providerRef.current = new GoogleAIProvider(settings);
+            providerRef.current = new GeminiProvider(settings);
             break;
+          case 'anthropic':
+            throw new Error('Anthropic provider not yet implemented');
           default:
             throw new Error(`Unknown provider: ${settings.provider}`);
         }
@@ -41,4 +43,4 @@ export function useAIProvider() {
   }, []);
 
   return providerRef;
-} 
+}

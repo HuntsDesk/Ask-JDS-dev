@@ -1,15 +1,10 @@
 import { type ReactNode } from 'react';
-import { AuthContext } from './auth-provider';
+import { AuthContext } from '@/lib/auth';
+import type { AuthContextType } from '@/types';
 
 interface AuthProviderProps {
   children: ReactNode;
-  value: {
-    user: User | null;
-    loading: boolean;
-    signIn: (email: string, password: string) => Promise<void>;
-    signUp: (email: string, password: string) => Promise<void>;
-    signOut: () => Promise<void>;
-  };
+  value: AuthContextType;
 }
 
 export function AuthProvider({ children, value }: AuthProviderProps) {
@@ -18,4 +13,4 @@ export function AuthProvider({ children, value }: AuthProviderProps) {
       {children}
     </AuthContext.Provider>
   );
-} 
+}

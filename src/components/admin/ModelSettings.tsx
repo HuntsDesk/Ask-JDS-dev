@@ -19,48 +19,38 @@ import {
 } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/supabase';
+import type { ModelData } from '@/types';
 
-interface ModelData {
+interface SupabaseUser {
   id: string;
-  name: string;
-  provider: string;
-  is_active: boolean;
-  created_at: string;
-}
-
-interface User {
-  id: string;
-  user_metadata: {
-    is_admin: boolean;
-  };
+  isAdmin?: boolean;
 }
 
 const PROVIDERS = {
   openai: {
     name: 'OpenAI',
     versions: ['gpt-4', 'gpt-3.5-turbo'],
-    envKey: 'VITE_OPENAI_API_KEY'
   },
-  gemini: {
+  google: {
     name: 'Google Gemini',
     versions: ['gemini-pro'],
-    envKey: 'VITE_GEMINI_API_KEY'
   },
   anthropic: {
     name: 'Anthropic',
     versions: ['claude-3-sonnet'],
-    envKey: 'VITE_ANTHROPIC_API_KEY'
   }
-};
+} as const;
+
+type Provider = keyof typeof PROVIDERS;
 
 export function ModelSettings() {
   const [models, setModels] = useState<ModelData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [newModel, setNewModel] = useState({
     name: '',
-    provider: 'openai' as 'openai' | 'gemini' | 'anthropic',
-    model_version: 'gpt-4o'
+    provider: 'openai' as Provider,
+    model_version: 'gpt-4'
   });
   const { toast } = useToast();
 
@@ -88,7 +78,11 @@ export function ModelSettings() {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
 
-      if (currentUser?.user_metadata?.is_admin) {
+      // Check if user is admin using the isAdmin property from auth context
+      const { data: { session } } = await supabase.auth.getSession();
+      const isAdmin = session?.user?.user_metadata?.is_admin || false;
+      
+      if (isAdmin) {
         await loadModels();
       } else {
         setLoading(false);
@@ -98,12 +92,12 @@ export function ModelSettings() {
     init();
   }, [loadModels]);
 
-  // Move the admin check here, after loading is complete
   if (loading) {
     return <div>Loading...</div>;
   }
 
-  if (!user?.user_metadata?.is_admin) {
+  // Check if user is admin using the isAdmin property
+  if (!user?.isAdmin) {
     return <div>Access denied. Admin privileges required.</div>;
   }
 
@@ -171,25 +165,6 @@ export function ModelSettings() {
 
   return (
     <div className="space-y-6">
-      <Button 
-        onClick={async () => {
-          const { data: { session } } = await supabase.auth.getSession();
-          console.log('Current session:', session);
-          
-          // Test a simple select
-          const { data, error } = await supabase
-            .from('models')
-            .select('id')
-            .limit(1);
-          
-          console.log('Test request result:', data);
-          console.log('Test request error:', error);
-        }}
-        variant="outline"
-      >
-        Check Auth State
-      </Button>
-
       <div className="rounded-md border p-4">
         <h2 className="text-lg font-semibold mb-4">Add New Model</h2>
         <div className="space-y-4">
@@ -213,7 +188,7 @@ export function ModelSettings() {
                 value={newModel.provider}
                 onValueChange={(value) => {
                   console.log('Provider changed:', value);
-                  setNewModel({ ...newModel, provider: value as 'openai' | 'gemini' | 'anthropic' });
+                  setNewModel({ ...newModel, provider: value as Provider });
                 }}
               >
                 <SelectTrigger>
@@ -269,7 +244,7 @@ export function ModelSettings() {
             {models.map((model) => (
               <TableRow key={model.id}>
                 <TableCell>{model.name}</TableCell>
-                <TableCell>{PROVIDERS[model.provider].name}</TableCell>
+                <TableCell>{PROVIDERS[model.provider as Provider]?.name || model.provider}</TableCell>
                 <TableCell>{model.model_version}</TableCell>
                 <TableCell>{model.is_active ? 'Active' : 'Inactive'}</TableCell>
                 <TableCell>

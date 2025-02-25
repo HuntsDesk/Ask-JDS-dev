@@ -27,9 +27,11 @@ export async function getAIProvider(): Promise<AIProvider> {
       case 'openai':
         currentProvider = new OpenAIProvider(currentSettings);
         break;
-      case 'gemini':
+      case 'google':
         currentProvider = new GeminiProvider(currentSettings);
         break;
+      case 'anthropic':
+        throw new Error('Anthropic provider not yet implemented');
       default:
         throw new Error(`Unsupported AI provider: ${currentSettings.provider}`);
     }
@@ -55,4 +57,4 @@ supabase
       currentProvider = null; // Force provider recreation
     }
   )
-  .subscribe(); 
+  .subscribe();

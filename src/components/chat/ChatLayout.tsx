@@ -27,11 +27,27 @@ export function ChatLayout() {
   const isGenerating = messagesResult?.isGenerating || false;
 
   // Set active thread to most recent thread on initial load
+  // or create a default thread for new users
   useEffect(() => {
-    if (!activeThread && threads.length > 0) {
-      setActiveThread(threads[0].id);
+    if (!threadsLoading) {
+      if (threads.length > 0) {
+        // If user has threads, set the most recent one as active
+        if (!activeThread) {
+          setActiveThread(threads[0].id);
+        }
+      } else if (user) {
+        // If user has no threads, create a default thread
+        console.log('Creating default thread for new user');
+        createThread().then(thread => {
+          if (thread) {
+            setActiveThread(thread.id);
+          }
+        }).catch(error => {
+          console.error('Failed to create default thread:', error);
+        });
+      }
     }
-  }, [threads, activeThread]);
+  }, [threads, activeThread, threadsLoading, user, createThread]);
 
   const handleNewChat = async () => {
     try {
@@ -55,11 +71,12 @@ export function ChatLayout() {
 
   const handleDeleteThread = async (threadId: string) => {
     try {
-      await deleteThread(threadId);
-      if (activeThread === threadId) {
-        // Set active thread to the next available thread
-        const remainingThreads = threads.filter(t => t.id !== threadId);
-        setActiveThread(remainingThreads.length > 0 ? remainingThreads[0].id : null);
+      // Modify the useThreads hook to expose a function for optimistic updates
+      const success = await deleteThread(threadId);
+      
+      if (!success) {
+        // If deletion fails, we could implement additional error handling here
+        console.error('Thread deletion failed on the server');
       }
     } catch (error) {
       console.error('Failed to delete thread:', error);

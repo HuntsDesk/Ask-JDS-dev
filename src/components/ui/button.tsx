@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/lib/constants/button-variants';
 import { ButtonContext } from '@/lib/constants/button-context';
 
-interface ButtonProps
+export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
@@ -27,5 +27,4 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = 'Button';
 
-// Only export the component
-export { Button };
+export { Button, buttonVariants };

@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+declare const self: ServiceWorkerGlobalScope;
+
 const CACHE_NAME = 'jds-app-cache-v1';
 const OFFLINE_URL = '/offline.html';
 
@@ -16,23 +18,12 @@ interface CachePayload {
   options?: RequestInit;
 }
 
-interface MessageEvent {
-  type: 'CACHE_URLS';
-  payload: CachePayload[];
+interface ExtendableMessageEvent extends ExtendableEvent {
+  data: {
+    type: 'CACHE_URLS';
+    payload: CachePayload[];
+  };
 }
-
-interface SyncMessage {
-  id: string;
-  content: string;
-  timestamp: number;
-}
-
-interface ExtendedSelf extends ServiceWorkerGlobalScope {
-  skipWaiting: () => void;
-  clients: Clients;
-}
-
-declare const self: ExtendedSelf;
 
 self.addEventListener('install', (event: ExtendableEvent) => {
   event.waitUntil(
@@ -40,7 +31,7 @@ self.addEventListener('install', (event: ExtendableEvent) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  self.skipWaiting();
+  void self.skipWaiting();
 });
 
 self.addEventListener('activate', (event: ExtendableEvent) => {
@@ -53,7 +44,7 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
       );
     })
   );
-  self.clients.claim();
+  void self.clients.claim();
 });
 
 self.addEventListener('fetch', (event: FetchEvent) => {
@@ -119,42 +110,40 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 });
 
 // Handle background sync
-self.addEventListener('sync', (event: SyncEvent) => {
-  if (event.tag === 'sync-messages') {
-    event.waitUntil(syncMessages());
-  }
-});
-
-async function syncMessages() {
-  const pendingMessages = await getPendingMessages();
-  for (const msg of pendingMessages) {
-    try {
-      await sendMessage(msg);
-      await removePendingMessage(msg.id);
-    } catch (err) {
-      console.error('Failed to sync message:', err);
-    }
-  }
+// This interface is defined for future implementation of background sync functionality
+/*
+interface PendingMessage {
+  id: string;
+  content: string;
+  timestamp: number;
 }
+*/
 
-async function getPendingMessages(): Promise<SyncMessage[]> {
-  return [];
-}
+// Message handling functions
+// These functions are commented out as they're not currently used
+// but may be needed in future implementations
 
-async function sendMessage(msg: SyncMessage): Promise<void> {
-  // Implementation would send message to server
-  console.log('Sending message:', msg);
-}
+/*
+export const getPendingMessages = async (): Promise<PendingMessage[]> => {
+  const db = await openDB();
+  return db.getAll('pendingMessages');
+};
 
-async function removePendingMessage(id: string): Promise<void> {
-  // Implementation would remove message from pending queue
-  console.log('Removing pending message:', id);
-}
+export const sendMessage = async (message: PendingMessage): Promise<void> => {
+  const db = await openDB();
+  await db.add('pendingMessages', message);
+};
 
-self.addEventListener('message', (event: MessageEvent) => {
-  if (event.type === 'CACHE_URLS') {
+export const removePendingMessage = async (id: string): Promise<void> => {
+  const db = await openDB();
+  await db.delete('pendingMessages', id);
+};
+*/
+
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
+  if (event.data.type === 'CACHE_URLS') {
     event.waitUntil(
-      cacheFiles(event.payload)
+      cacheFiles(event.data.payload)
     );
   }
 });

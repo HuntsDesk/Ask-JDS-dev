@@ -65,7 +65,10 @@ export function useThreads() {
     try {
       const { data, error } = await supabase
         .from('threads')
-        .insert([{ user_id: user.id }])
+        .insert([{ 
+          user_id: user.id,
+          title: 'New Conversation'
+        }])
         .select()
         .single();
 
@@ -99,13 +102,28 @@ export function useThreads() {
     if (!user) return false;
 
     try {
+      // Optimistically update the UI immediately
+      setThreads(prev => prev.filter(thread => thread.id !== id));
+      
+      // Then perform the actual deletion on the server
       const { error } = await supabase
         .from('threads')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        // If there's an error, revert the optimistic update
+        const { data } = await supabase
+          .from('threads')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+          
+        setThreads(data || []);
+        throw error;
+      }
+      
       return true;
     } catch (error) {
       console.error('Error deleting thread:', error);
