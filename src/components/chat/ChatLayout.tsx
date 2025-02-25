@@ -21,7 +21,19 @@ export function ChatLayout() {
     deleteThread
   } = useThreads();
 
-  const messagesResult = useMessages(activeThread);
+  // Create a callback for updating thread titles
+  const handleThreadTitleGenerated = async (title: string) => {
+    if (activeThread) {
+      console.log(`Updating thread title to "${title}" after 3 messages`);
+      await updateThread(activeThread, { title });
+    }
+  };
+
+  const messagesResult = useMessages(
+    activeThread, 
+    undefined, // onFirstMessage callback (not needed here)
+    handleThreadTitleGenerated // Pass the title update callback
+  );
   const messages = messagesResult?.messages || [];
   const messagesLoading = messagesResult?.loading || false;
   const isGenerating = messagesResult?.isGenerating || false;
