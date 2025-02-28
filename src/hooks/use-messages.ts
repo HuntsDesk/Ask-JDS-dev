@@ -6,6 +6,13 @@ import { logError } from '@/lib/supabase';
 import { createAIProvider } from '@/lib/ai/provider-factory';
 import { useSettings } from './use-settings';
 import type { AIProvider } from '@/types/ai';
+import { 
+  incrementUserMessageCount, 
+  hasReachedFreeMessageLimit,
+  getUserMessageCount,
+  FREE_MESSAGE_LIMIT,
+  hasActiveSubscription
+} from '@/lib/subscription';
 
 export function useMessages(threadId: string | null, onFirstMessage?: (message: string) => void, onThreadTitleGenerated?: (title: string) => Promise<void>) {
   const { settings } = useSettings();
@@ -13,12 +20,17 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const { toast } = useToast();
   const isFirstMessageRef = useRef(true);
   const userMessageCountRef = useRef(0);
-  const { user } = supabase.auth.getUser();
   // Add a ref to track message IDs we've already added
   const addedMessageIds = useRef(new Set<string>());
+  // Add refs for tracking initial load and toast timeouts
+  const initialLoadRef = useRef(true);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize AI provider when settings change
   useEffect(() => {
@@ -26,6 +38,25 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
       aiProvider.current = createAIProvider(settings);
     }
   }, [settings]);
+
+  // Load user's message count and subscription status on mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const [count, subscribed] = await Promise.all([
+          getUserMessageCount(),
+          hasActiveSubscription()
+        ]);
+        
+        setMessageCount(count);
+        setIsSubscribed(subscribed);
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      }
+    };
+    
+    loadUserData();
+  }, []);
 
   // Function to generate a thread title based on multiple messages
   const generateThreadTitle = async (userMessages: Message[]): Promise<string> => {
@@ -57,6 +88,24 @@ Respond with ONLY the title, no quotes or additional text.`;
     }
   };
 
+  // Helper function to show delayed toast notifications
+  const showDelayedToast = useCallback((toastOptions: any, delay: number = 2000) => {
+    // Clear any existing timeout
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    
+    // Only delay toasts on initial load
+    if (initialLoadRef.current) {
+      toastTimeoutRef.current = setTimeout(() => {
+        toast(toastOptions);
+        toastTimeoutRef.current = null;
+      }, delay);
+    } else {
+      toast(toastOptions);
+    }
+  }, [toast]);
+
   const loadMessages = useCallback(async () => {
     if (!threadId) {
       setMessages([]);
@@ -70,48 +119,110 @@ Respond with ONLY the title, no quotes or additional text.`;
     // Reset user message counter when loading a new thread
     userMessageCountRef.current = 0;
 
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('thread_id', threadId)
-        .order('created_at', { ascending: true });
+    // Maximum number of retry attempts
+    const MAX_RETRIES = 2;
+    let retryCount = 0;
+    let success = false;
 
-      if (error) throw error;
-      
-      const messagesList = data || [];
-      
-      // Add all loaded message IDs to our tracking set
-      messagesList.forEach(msg => {
-        addedMessageIds.current.add(msg.id);
-        // Count existing user messages
-        if (msg.role === 'user') {
-          userMessageCountRef.current++;
-        }
-      });
-      
-      setMessages(messagesList);
+    while (retryCount <= MAX_RETRIES && !success) {
+      try {
+        // Create a timeout promise that resolves to empty messages
+        const timeoutPromise = new Promise<{data: Message[], error: null}>((resolve) => {
+          setTimeout(() => {
+            console.warn(`useMessages: Loading messages timed out after 10 seconds (attempt ${retryCount + 1}/${MAX_RETRIES + 1}), returning empty messages`);
+            resolve({data: [], error: null});
+          }, 10000); // 10 second timeout (increased from 6 seconds)
+        });
+        
+        // Load messages
+        const fetchPromise = supabase
+          .from('messages')
+          .select('*')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: true });
+        
+        // Race the fetch against the timeout
+        const result = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        const { data, error } = result;
 
-      // Handle first message callback if needed
-      if (messagesList.length > 0 && onFirstMessage && isFirstMessageRef.current) {
-        const firstUserMessage = messagesList.find(m => m.role === 'user');
-        if (firstUserMessage) {
-          onFirstMessage(firstUserMessage.content);
-          isFirstMessageRef.current = false;
+        if (error) {
+          console.error('Error loading messages:', error);
+          console.error('Error details:', JSON.stringify(error));
+          await logError(error, 'Load Messages');
+          
+          if (retryCount === MAX_RETRIES) {
+            showDelayedToast({
+              title: 'Error',
+              description: 'Failed to load messages. Please try again.',
+              variant: 'destructive',
+            });
+            setMessages([]);
+          }
+          retryCount++;
+          continue;
         }
+        
+        const messagesList = data || [];
+        const wasTimeout = !data || messagesList.length === 0;
+        
+        if (wasTimeout) {
+          if (retryCount < MAX_RETRIES) {
+            console.log(`useMessages: Attempt ${retryCount + 1}/${MAX_RETRIES + 1} timed out, retrying...`);
+            retryCount++;
+            continue;
+          }
+          
+          showDelayedToast({
+            title: 'Slow database response',
+            description: 'Your messages may take longer to load. Please wait or try refreshing.',
+            variant: 'warning',
+          });
+        }
+        
+        // Add all loaded message IDs to our tracking set
+        messagesList.forEach(msg => {
+          addedMessageIds.current.add(msg.id);
+          // Count existing user messages
+          if (msg.role === 'user') {
+            userMessageCountRef.current++;
+          }
+        });
+        
+        setMessages(messagesList);
+
+        // Handle first message callback if needed
+        if (messagesList.length > 0 && onFirstMessage && isFirstMessageRef.current) {
+          const firstUserMessage = messagesList.find(m => m.role === 'user');
+          if (firstUserMessage) {
+            onFirstMessage(firstUserMessage.content);
+            isFirstMessageRef.current = false;
+          }
+        }
+
+        success = true;
+      } catch (error) {
+        console.error(`useMessages: Error loading messages (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error);
+        await logError(error, 'Load Messages');
+        
+        if (retryCount === MAX_RETRIES) {
+          showDelayedToast({
+            title: 'Error',
+            description: 'Failed to load messages. Please try again.',
+            variant: 'destructive',
+          });
+          // Ensure messages are set to empty array on error
+          setMessages([]);
+        }
+        retryCount++;
       }
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      await logError(error, 'Load Messages');
-      toast({
-        title: 'Error',
-        description: 'Failed to load messages. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
     }
-  }, [threadId, onFirstMessage, toast]);
+    
+    setLoading(false);
+    
+    // After the first load, set initialLoadRef to false
+    initialLoadRef.current = false;
+  }, [threadId, onFirstMessage, showDelayedToast]);
 
   // Load messages when thread changes
   useEffect(() => {
@@ -120,6 +231,14 @@ Respond with ONLY the title, no quotes or additional text.`;
     isFirstMessageRef.current = true;
     // Reset user message counter when thread changes
     userMessageCountRef.current = 0;
+    
+    return () => {
+      // Clear any pending toast timeouts when unmounting or changing threads
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+        toastTimeoutRef.current = null;
+      }
+    };
   }, [threadId, loadMessages]);
 
   // Subscribe to real-time updates
@@ -161,9 +280,45 @@ Respond with ONLY the title, no quotes or additional text.`;
     }
   }, [threadId]);
 
+  // Check if user has reached message limit before sending
+  const checkMessageLimit = useCallback(async (): Promise<boolean> => {
+    try {
+      // Refresh subscription status before checking limit
+      const subscribed = await hasActiveSubscription();
+      setIsSubscribed(subscribed);
+      
+      // If user is subscribed, they have no limit
+      if (subscribed) {
+        return false;
+      }
+      
+      // For free users, check if they've reached the limit
+      const count = await getUserMessageCount();
+      setMessageCount(count);
+      
+      const hasReachedLimit = count >= FREE_MESSAGE_LIMIT;
+      setShowPaywall(hasReachedLimit);
+      return hasReachedLimit;
+    } catch (error) {
+      console.error('Error checking message limit:', error);
+      return false;
+    }
+  }, []);
+
+  // Handle closing the paywall
+  const handleClosePaywall = useCallback(() => {
+    setShowPaywall(false);
+  }, []);
+
   const sendMessage = useCallback(async (content: string) => {
     if (!threadId || !aiProvider.current) return null;
     if (!content.trim()) return null;
+
+    // Check if user has reached message limit
+    const hasReachedLimit = await checkMessageLimit();
+    if (hasReachedLimit) {
+      return null;
+    }
 
     let optimisticUserMessage: Message | null = null;
 
@@ -225,7 +380,11 @@ Respond with ONLY the title, no quotes or additional text.`;
         });
       }
 
-      // Increment user message count
+      // Increment user message count in database and update local state
+      const newCount = await incrementUserMessageCount();
+      setMessageCount(newCount);
+      
+      // Increment local thread message counter
       userMessageCountRef.current++;
 
       // Generate AI response with conversation history
@@ -314,13 +473,18 @@ Respond with ONLY the title, no quotes or additional text.`;
     } finally {
       setIsGenerating(false);
     }
-  }, [threadId, messages, toast, onFirstMessage]);
+  }, [threadId, messages, toast, onFirstMessage, checkMessageLimit, generateThreadTitle, onThreadTitleGenerated]);
 
   return {
     messages,
     loading,
     isGenerating,
     loadMessages,
-    sendMessage
+    sendMessage,
+    showPaywall,
+    handleClosePaywall,
+    messageCount,
+    messageLimit: FREE_MESSAGE_LIMIT,
+    isSubscribed
   };
 }

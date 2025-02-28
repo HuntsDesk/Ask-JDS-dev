@@ -3,9 +3,11 @@ import type { Content, Part } from '@google/generative-ai';
 export interface User {
   id: string;
   email: string;
+  // isAdmin is always false in the user app, kept for compatibility with shared backend
   isAdmin: boolean;
   last_sign_in_at?: string;
   user_metadata?: {
+    // is_admin is ignored in the user app, but kept for compatibility with shared backend
     is_admin?: boolean;
     preferences?: Record<string, unknown>;
     settings?: Record<string, unknown>;
@@ -59,6 +61,7 @@ export interface ModelData {
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
+  authInitialized: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<{ error: Error | null }>;

@@ -22,7 +22,7 @@ export function LoadingSpinner({
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
         <Loader2 className={cn(
-          'animate-spin text-primary',
+          'animate-spin text-[#F37022]',
           sizeClasses[size],
           className
         )} />
@@ -32,7 +32,7 @@ export function LoadingSpinner({
 
   return (
     <Loader2 className={cn(
-      'animate-spin text-primary',
+      'animate-spin text-[#F37022]',
       sizeClasses[size],
       className
     )} />

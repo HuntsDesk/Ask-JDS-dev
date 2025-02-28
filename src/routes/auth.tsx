@@ -1,12 +1,10 @@
 import { Route, Routes } from 'react-router-dom';
-import { SignInForm } from '@/components/auth/SignInForm';
-import { SignUpForm } from '@/components/auth/SignUpForm';
+import { AuthPage } from '@/components/auth/AuthPage';
 
 export function AuthRoutes() {
   return (
     <Routes>
-      <Route path="signin" element={<SignInForm />} />
-      <Route path="signup" element={<SignUpForm />} />
+      <Route path="/" element={<AuthPage />} />
     </Routes>
   );
 } 

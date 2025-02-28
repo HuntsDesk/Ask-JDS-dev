@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Link } from 'react-router-dom';
 
 const authSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -66,7 +67,16 @@ export function AuthForm() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md p-6 space-y-6">
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold">Ask JDS</h1>
+          <div className="flex justify-center mb-4">
+            <Link to="/">
+              <img 
+                src="/images/JD Simplified Logo - Horizontal.svg" 
+                alt="JD Simplified Logo" 
+                className="h-10 hover:opacity-80 transition-opacity" 
+              />
+            </Link>
+          </div>
+          <h1 className="text-2xl font-bold">Ask JDS by JD Simplified</h1>
           <p className="text-muted-foreground">
             {isSignUp ? 'Create an account' : 'Sign in to your account'}
           </p>

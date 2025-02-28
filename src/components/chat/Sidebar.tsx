@@ -10,7 +10,8 @@ import {
   MessageSquare,
   Shield,
   PlusCircle,
-  Pencil
+  Pencil,
+  Settings
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -19,9 +20,10 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Input } from '@/components/ui/input';
+import { Link } from 'react-router-dom';
 
 interface SidebarProps {
-  setActiveTab: (id: string | null) => void;
+  setActiveTab: (tab: string) => void;
   isDesktopExpanded: boolean;
   onDesktopExpandedChange: (expanded: boolean) => void;
   onNewChat: () => void;
@@ -34,9 +36,6 @@ interface SidebarProps {
     created_at: string;
   }[];
   currentSession: string | null;
-  activeView: 'chat' | 'admin';
-  setActiveView: (view: 'chat' | 'admin') => void;
-  isAdmin: boolean;
 }
 
 interface GroupedSessions {
@@ -53,9 +52,6 @@ export function Sidebar({
   onRenameThread,
   sessions,
   currentSession,
-  activeView,
-  setActiveView,
-  isAdmin
 }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
@@ -207,14 +203,16 @@ export function Sidebar({
                       ) : (
                         <button
                           onClick={() => {
+                            // Optimistically update the UI without waiting for the db
                             setActiveTab(session.id);
-                            setActiveView('chat');
+                            
+                            // If on mobile, collapse the sidebar
                             if (isMobile) onDesktopExpandedChange(false);
                           }}
                           className={cn(
                             "w-full flex items-center gap-3 rounded-lg nav-item",
                             isDesktopExpanded ? "px-3 py-2" : "p-2 justify-center",
-                            currentSession === session.id && activeView === 'chat' && "active"
+                            currentSession === session.id && "active"
                           )}
                         >
                           <MessageSquare className="w-4 h-4 shrink-0" />
@@ -248,33 +246,28 @@ export function Sidebar({
       </ScrollArea>
 
       <div className="sticky bottom-0 z-30 bg-background p-3 border-t space-y-2">
-        {isAdmin && (
-          <Button 
-            onClick={() => {
-              setActiveView('admin');
-              if (isMobile) onDesktopExpandedChange(false);
-            }}
-            variant={activeView === 'admin' ? 'secondary' : 'ghost'}
+        <Link to="/settings">
+          <Button
+            variant="ghost"
             className={cn(
-              "w-full flex items-center transition-all",
-              isDesktopExpanded ? "justify-start px-4" : "justify-center px-2"
+              "w-full flex items-center gap-2 transition-all",
+              isDesktopExpanded ? "justify-start px-4" : "justify-center px-0"
             )}
           >
-            <Shield className="w-4 h-4 shrink-0" />
-            {isDesktopExpanded && <span className="ml-2">Admin</span>}
+            <Settings className="h-4 w-4 shrink-0" />
+            {isDesktopExpanded && <span>Settings</span>}
           </Button>
-        )}
-
-        <Button 
-          onClick={onSignOut} 
-          variant="outline" 
+        </Link>
+        <Button
+          onClick={onSignOut}
+          variant="ghost"
           className={cn(
-            "w-full flex items-center transition-all",
-            isDesktopExpanded ? "justify-start px-4" : "justify-center px-2"
+            "w-full flex items-center gap-2 transition-all",
+            isDesktopExpanded ? "justify-start px-4" : "justify-center px-0"
           )}
         >
-          <LogOut className="w-4 h-4 shrink-0" />
-          {isDesktopExpanded && <span className="ml-2">Sign Out</span>}
+          <LogOut className="h-4 w-4 shrink-0" />
+          {isDesktopExpanded && <span>Sign out</span>}
         </Button>
       </div>
     </div>
