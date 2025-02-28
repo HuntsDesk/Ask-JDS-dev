@@ -11,7 +11,8 @@ import {
   Shield,
   PlusCircle,
   Pencil,
-  Settings
+  Settings,
+  BookOpen
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -246,6 +247,18 @@ export function Sidebar({
       </ScrollArea>
 
       <div className="sticky bottom-0 z-30 bg-background p-3 border-t space-y-2">
+        <Link to="/flashcards">
+          <Button
+            variant="ghost"
+            className={cn(
+              "w-full flex items-center gap-2 transition-all",
+              isDesktopExpanded ? "justify-start px-4" : "justify-center px-0"
+            )}
+          >
+            <BookOpen className="h-4 w-4 shrink-0" />
+            {isDesktopExpanded && <span>Flashcards</span>}
+          </Button>
+        </Link>
         <Link to="/settings">
           <Button
             variant="ghost"

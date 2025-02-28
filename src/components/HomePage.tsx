@@ -386,7 +386,7 @@ export function HomePage() {
           <p className="text-2xl text-white mb-10">
             {hasSubscription 
               ? "You're all set with your premium subscription! Head to the chat to start asking questions."
-              : "Skip the overpriced tutors and questionable Reddit advice—Ask JDS is your $5/month legal survival guide."}
+              : "Skip the overpriced tutors and questionable Reddit advice—AsPH levels 98% effective tutorial on how to make it Lemon balm and I will send it cucumber JDS is your $5/month legal survival guide."}
           </p>
           <div className="flex flex-col md:flex-row gap-4 mt-8 justify-center">
             {user ? (
