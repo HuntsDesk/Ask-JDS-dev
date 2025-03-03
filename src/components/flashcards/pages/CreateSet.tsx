@@ -72,7 +72,7 @@ export default function CreateSet() {
   };
 
   const validateForm = () => {
-    if (!title.trim()) return 'Please enter a title for your flashcard set';
+    if (!title.trim()) return 'Please enter a title for your flashcard collection';
     if (!subjectId && !newSubjectName) return 'Please select or create a subject';
     if (cards.length === 0) return 'Please add at least one flashcard';
     
@@ -158,7 +158,7 @@ export default function CreateSet() {
       
       if (cardsError) throw cardsError;
       
-      showToast('Flashcard set created successfully!', 'success');
+      showToast('Flashcard collection created successfully!', 'success');
       navigate(`/flashcards/study/${collection.id}`);
       
     } catch (err) {
@@ -186,20 +186,20 @@ export default function CreateSet() {
       
       {error && <ErrorMessage message={error} />}
       
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Create Flashcard Set</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-6">Create Flashcard Collection</h1>
       
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
         <div className="p-6">
           <div className="mb-6">
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-              Set Title*
+              Collection Title*
             </label>
             <input
               type="text"
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
               placeholder="e.g. Biology Midterm"
               required
             />
@@ -213,8 +213,8 @@ export default function CreateSet() {
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Optional description of this flashcard set"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
+              placeholder="Optional description of this flashcard collection"
               rows={3}
             />
           </div>
@@ -227,7 +227,7 @@ export default function CreateSet() {
               <button
                 type="button"
                 onClick={toggleNewSubjectForm}
-                className="text-sm text-indigo-600 hover:text-indigo-800"
+                className="text-sm text-[#F37022] hover:text-[#E36012]"
               >
                 {showNewSubjectForm ? 'Select Existing Subject' : 'Create New Subject'}
               </button>
@@ -240,7 +240,7 @@ export default function CreateSet() {
                     type="text"
                     value={newSubjectName}
                     onChange={(e) => setNewSubjectName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                     placeholder="Subject Name"
                     required
                   />
@@ -249,7 +249,7 @@ export default function CreateSet() {
                   <textarea
                     value={newSubjectDescription}
                     onChange={(e) => setNewSubjectDescription(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                     placeholder="Subject Description (optional)"
                     rows={2}
                   />
@@ -260,7 +260,7 @@ export default function CreateSet() {
                 id="subject"
                 value={subjectId}
                 onChange={(e) => setSubjectId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                 required={!showNewSubjectForm}
               >
                 <option value="">Select a Subject</option>
@@ -275,7 +275,7 @@ export default function CreateSet() {
           
           <div className="mb-4">
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Flashcards</h2>
-            <p className="text-gray-600 mb-4">Add questions and answers for your flashcard set.</p>
+            <p className="text-gray-600 mb-4">Add questions and answers for your flashcard collection.</p>
           </div>
           
           {cards.map((card, index) => (
@@ -300,7 +300,7 @@ export default function CreateSet() {
                   id={`question-${index}`}
                   value={card.question}
                   onChange={(e) => updateCard(index, 'question', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                   placeholder="Enter your question"
                   rows={2}
                   required
@@ -315,7 +315,7 @@ export default function CreateSet() {
                   id={`answer-${index}`}
                   value={card.answer}
                   onChange={(e) => updateCard(index, 'answer', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                   placeholder="Enter your answer"
                   rows={3}
                   required
@@ -327,7 +327,7 @@ export default function CreateSet() {
           <button
             type="button"
             onClick={addCard}
-            className="flex items-center justify-center w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-indigo-600 hover:border-indigo-500 transition-colors"
+            className="flex items-center justify-center w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-[#F37022] hover:border-[#F37022] transition-colors"
           >
             <Plus className="h-5 w-5 mr-2" />
             Add Another Card
@@ -338,14 +338,14 @@ export default function CreateSet() {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="flex items-center bg-[#F37022] text-white px-6 py-2 rounded-md hover:bg-[#E36012] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F37022]"
           >
             {saving ? (
               <>Saving...</>
             ) : (
               <>
                 <Save className="h-5 w-5 mr-2" />
-                Create Flashcard Set
+                Create Flashcard Collection
               </>
             )}
           </button>

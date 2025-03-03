@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Save, ArrowLeft } from 'lucide-react';
+import { Save, ArrowLeft, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorMessage from '../ErrorMessage';
@@ -111,8 +111,8 @@ export default function EditSubject() {
       )}
       
       <div className="mb-8">
-        <Link to="/flashcards/subjects" className="text-indigo-600 hover:text-indigo-700 flex items-center gap-2">
-          <ArrowLeft className="h-5 w-5" />
+        <Link to="/flashcards/subjects" className="text-[#F37022] hover:text-[#E36012] flex items-center gap-2">
+          <ChevronLeft className="h-5 w-5" />
           Back to Subjects
         </Link>
         <h1 className="text-3xl font-bold text-gray-900 mt-4">Edit Subject</h1>
@@ -129,7 +129,7 @@ export default function EditSubject() {
               id="name"
               value={subject.name}
               onChange={(e) => setSubject({ ...subject, name: e.target.value })}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-[#F37022] focus:ring-[#F37022]"
               required
             />
           </div>
@@ -142,7 +142,7 @@ export default function EditSubject() {
               id="description"
               value={subject.description || ''}
               onChange={(e) => setSubject({ ...subject, description: e.target.value })}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-[#F37022] focus:ring-[#F37022]"
               rows={4}
             />
           </div>
@@ -151,7 +151,7 @@ export default function EditSubject() {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              className="flex items-center gap-2 bg-[#F37022] text-white px-6 py-2 rounded-md hover:bg-[#E36012] disabled:opacity-50"
             >
               <Save className="h-5 w-5" />
               {saving ? 'Saving...' : 'Save Changes'}

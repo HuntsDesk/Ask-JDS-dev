@@ -19,7 +19,6 @@ import {
   TabsTrigger 
 } from '@/components/ui/tabs';
 import { 
-  Loader2, 
   Mail, 
   Lock, 
   Brain, 
@@ -29,11 +28,16 @@ import {
   ArrowRight, 
   Stars,
   MessageSquare,
-  GraduationCap
+  GraduationCap,
+  User,
+  Eye,
+  EyeOff,
+  AlertCircle
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CSSTransition } from 'react-transition-group';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 interface AuthFormProps {
   initialTab?: 'signin' | 'signup';
@@ -320,10 +324,7 @@ export function AuthForm({ initialTab = 'signin' }: AuthFormProps) {
                             disabled={isLoading}
                           >
                             {isLoading ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Signing in...
-                              </>
+                              <LoadingSpinner size="sm" className="mr-2" />
                             ) : (
                               <>
                                 Sign In
@@ -385,10 +386,7 @@ export function AuthForm({ initialTab = 'signin' }: AuthFormProps) {
                             disabled={isLoading}
                           >
                             {isLoading ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Creating account...
-                              </>
+                              <LoadingSpinner size="sm" className="mr-2" />
                             ) : (
                               <>
                                 Create Account

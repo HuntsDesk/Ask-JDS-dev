@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useThreads } from '@/hooks/use-threads';
 import { useMessages } from '@/hooks/use-messages';
@@ -8,14 +8,19 @@ import { Loader2 } from 'lucide-react';
 import { Paywall } from '@/components/Paywall';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
+import { useParams, useNavigate } from 'react-router-dom';
+import { SelectedThreadContext, SidebarContext } from '@/App';
 
 export function ChatLayout() {
   const { user, signOut } = useAuth();
-  const [isDesktopExpanded, setIsDesktopExpanded] = useState(true);
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [messagesLoadingTimeout, setMessagesLoadingTimeout] = useState(false);
   const { toast } = useToast();
+  const { id: threadIdFromUrl } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+  const { selectedThreadId, setSelectedThreadId } = useContext(SelectedThreadContext);
+  const { isExpanded, setIsExpanded } = useContext(SidebarContext);
 
   const {
     threads,
@@ -24,6 +29,107 @@ export function ChatLayout() {
     updateThread,
     deleteThread
   } = useThreads();
+
+  // A helper function to log thread details
+  const logThreadInfo = () => {
+    console.log('----------- Thread Debug Info -----------');
+    console.log('ThreadID from URL:', threadIdFromUrl);
+    console.log('Global selectedThreadId:', selectedThreadId);
+    console.log('Component activeThread:', activeThread);
+    console.log('Available Threads:', threads.map(t => ({id: t.id, title: t.title})));
+    console.log('Thread loading:', threadsLoading);
+    console.log('----------------------------------------');
+  };
+
+  // Log thread info on important state changes
+  useEffect(() => {
+    logThreadInfo();
+  }, [threadIdFromUrl, activeThread, threads, threadsLoading, selectedThreadId]);
+
+  // Initialize the thread from URL or global state when component mounts
+  useEffect(() => {
+    // Make sure we have threads loaded
+    if (threads.length === 0 || threadsLoading) {
+      console.log('ChatLayout: Threads not loaded yet, waiting');
+      return;
+    }
+    
+    console.log('ChatLayout: Initializing thread selection with priorities:');
+    console.log('1. URL Param:', threadIdFromUrl);
+    console.log('2. Global Context:', selectedThreadId);
+    console.log('3. Current Active:', activeThread);
+    
+    // PRIORITY 1: URL parameter (highest priority)
+    if (threadIdFromUrl) {
+      const threadExists = threads.some(t => t.id === threadIdFromUrl);
+      if (threadExists) {
+        console.log('ChatLayout: Using thread ID from URL:', threadIdFromUrl);
+        setActiveThread(threadIdFromUrl);
+        // Also update global context
+        if (selectedThreadId !== threadIdFromUrl) {
+          setSelectedThreadId(threadIdFromUrl);
+        }
+        return;
+      } else {
+        console.warn('ChatLayout: Thread from URL not found:', threadIdFromUrl);
+      }
+    }
+    
+    // PRIORITY 2: Global context state
+    if (selectedThreadId) {
+      const threadExists = threads.some(t => t.id === selectedThreadId);
+      if (threadExists) {
+        console.log('ChatLayout: Using thread ID from global context:', selectedThreadId);
+        setActiveThread(selectedThreadId);
+        
+        // Update URL if needed
+        if (threadIdFromUrl !== selectedThreadId) {
+          console.log('ChatLayout: Updating URL to match global context:', selectedThreadId);
+          navigate(`/chat/${selectedThreadId}`, { replace: true });
+        }
+        return;
+      } else {
+        console.warn('ChatLayout: Thread from global context not found:', selectedThreadId);
+      }
+    }
+    
+    // PRIORITY 3: Current active thread state
+    if (activeThread) {
+      const threadExists = threads.some(t => t.id === activeThread);
+      if (threadExists) {
+        console.log('ChatLayout: Keeping current active thread:', activeThread);
+        
+        // Update URL and global context if needed
+        if (threadIdFromUrl !== activeThread) {
+          navigate(`/chat/${activeThread}`, { replace: true });
+        }
+        if (selectedThreadId !== activeThread) {
+          setSelectedThreadId(activeThread);
+        }
+        return;
+      }
+    }
+    
+    // PRIORITY 4: Default to first thread if nothing else is selected
+    if (threads.length > 0) {
+      const firstThreadId = threads[0].id;
+      console.log('ChatLayout: Nothing selected, defaulting to first thread:', firstThreadId);
+      setActiveThread(firstThreadId);
+      setSelectedThreadId(firstThreadId);
+      navigate(`/chat/${firstThreadId}`, { replace: true });
+    }
+  }, [threads, threadsLoading, threadIdFromUrl, selectedThreadId, activeThread, navigate]);
+
+  // Change active thread when a new thread is selected
+  const handleSetActiveThread = (threadId: string) => {
+    console.log('ChatLayout: handleSetActiveThread called with thread ID:', threadId);
+    if (threadId && threads.some(t => t.id === threadId)) {
+      setActiveThread(threadId);
+      setSelectedThreadId(threadId);
+    } else {
+      console.log('ChatLayout: Attempted to set invalid thread ID:', threadId);
+    }
+  };
 
   // Check if user has active subscription
   useEffect(() => {
@@ -326,9 +432,9 @@ export function ChatLayout() {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar
-        setActiveTab={setActiveThread}
-        onDesktopExpandedChange={setIsDesktopExpanded}
-        isDesktopExpanded={isDesktopExpanded}
+        setActiveTab={handleSetActiveThread}
+        isDesktopExpanded={isExpanded}
+        onDesktopExpandedChange={setIsExpanded}
         onNewChat={handleNewChat}
         onSignOut={handleSignOut}
         onDeleteThread={handleDeleteThread}
@@ -343,7 +449,7 @@ export function ChatLayout() {
       
       <main 
         className={`flex-1 h-screen transition-all duration-300 ${
-          isDesktopExpanded ? 'ml-[var(--sidebar-width)]' : 'ml-[var(--sidebar-collapsed-width)]'
+          isExpanded ? 'ml-[var(--sidebar-width)]' : 'ml-[var(--sidebar-collapsed-width)]'
         }`}
       >
         <div className="h-full relative">

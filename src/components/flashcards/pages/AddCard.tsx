@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Save, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Save, ArrowLeft, ExternalLink, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorMessage from '../ErrorMessage';
@@ -125,7 +125,7 @@ export default function AddCard() {
       <ErrorMessage 
         message={error || 'Collection not found'} 
         backLink={{
-          to: "/flashcards/sets",
+          to: "/flashcards/collections",
           label: "Back to Collections"
         }}
       />
@@ -143,8 +143,8 @@ export default function AddCard() {
       )}
       
       <div className="mb-8">
-        <Link to={`/flashcards/edit/${id}`} className="text-indigo-600 hover:text-indigo-700 flex items-center gap-2">
-          <ArrowLeft className="h-5 w-5" />
+        <Link to={`/flashcards/edit/${id}`} className="text-[#F37022] hover:text-[#E36012] flex items-center gap-2">
+          <ChevronLeft className="h-5 w-5" />
           Back to Collection
         </Link>
         <h1 className="text-3xl font-bold text-gray-900 mt-4">Add Card to Collection</h1>
@@ -162,7 +162,7 @@ export default function AddCard() {
                 type="text"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                 required
               />
             </div>
@@ -172,7 +172,7 @@ export default function AddCard() {
               <textarea
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                 rows={5}
                 required
               />
@@ -188,7 +188,7 @@ export default function AddCard() {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              className="flex items-center gap-2 bg-[#F37022] text-white px-6 py-2 rounded-md hover:bg-[#E36012] disabled:opacity-50"
             >
               <Save className="h-5 w-5" />
               {saving ? 'Saving...' : 'Save & Add Another'}

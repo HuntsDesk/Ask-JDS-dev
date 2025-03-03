@@ -240,7 +240,7 @@ export function ChatInterface({
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <h3 className="text-xl font-semibold mb-2">Start a new conversation</h3>
                 <p className="mb-4 text-gray-600 max-w-md">
-                Engage in insightful legal discussions. Whether you’re preparing for the bar exam, 
+                Engage in insightful legal discussions. Whether you're preparing for the bar exam, 
                 navigating law school, or exploring complex legal topics, Ask JDS is here to provide 
                 clear, reliable, and knowledgeable guidance.
                 </p>
@@ -273,7 +273,7 @@ export function ChatInterface({
               <div className="flex items-start mb-4">
                 <div className="flex-1 bg-muted p-3 rounded-lg">
                   <div className="flex items-center">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2 text-muted-foreground" />
+                    <LoadingSpinner size="sm" className="mr-2 text-muted-foreground" />
                     <span className="text-sm">Ask JDS is responding...</span>
                   </div>
                 </div>
@@ -333,9 +333,11 @@ export function ChatInterface({
                     <SendIcon className={`w-4 h-4 absolute inset-0 transition-opacity duration-200 ${
                       sending ? 'opacity-0' : 'opacity-100'
                     }`} />
-                    <Loader2 className={`w-4 h-4 absolute inset-0 animate-spin transition-opacity duration-200 ${
+                    <div className={`absolute inset-0 transition-opacity duration-200 ${
                       sending ? 'opacity-100' : 'opacity-0'
-                    }`} />
+                    }`}>
+                      <LoadingSpinner size="sm" />
+                    </div>
                   </div>
                 </Button>
               </TooltipTrigger>

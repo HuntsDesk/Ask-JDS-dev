@@ -12,7 +12,9 @@ import {
   PlusCircle,
   Pencil,
   Settings,
-  BookOpen
+  BookOpen,
+  Pin,
+  PinOff
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -21,7 +23,10 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Input } from '@/components/ui/input';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { SelectedThreadContext, SidebarContext } from '@/App';
+import { useContext } from 'react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface SidebarProps {
   setActiveTab: (tab: string) => void;
@@ -58,6 +63,39 @@ export function Sidebar({
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const [editingThread, setEditingThread] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { selectedThreadId, setSelectedThreadId } = useContext(SelectedThreadContext);
+  const { isPinned, setIsPinned, isExpanded, setIsExpanded } = useContext(SidebarContext);
+
+  // Check current active section based on URL
+  const isInChat = location.pathname.startsWith('/chat');
+  const isInFlashcards = location.pathname.startsWith('/flashcards');
+  const isInSettings = location.pathname.startsWith('/settings');
+  
+  // Check if we're in a specific chat thread by examining the URL or currentSession
+  const isInChatThread = isInChat && (currentSession !== null || location.pathname.length > 5);
+
+  // Sync local expanded state with global context
+  useEffect(() => {
+    if (isDesktopExpanded !== isExpanded) {
+      setIsExpanded(isDesktopExpanded);
+    }
+  }, [isDesktopExpanded, setIsExpanded]);
+
+  // Sync global expanded state with local props
+  useEffect(() => {
+    if (isExpanded !== isDesktopExpanded) {
+      onDesktopExpandedChange(isExpanded);
+    }
+  }, [isExpanded, onDesktopExpandedChange, isDesktopExpanded]);
+
+  // Ensure expanded state when pinned
+  useEffect(() => {
+    if (isPinned && !isDesktopExpanded) {
+      onDesktopExpandedChange(true);
+    }
+  }, [isPinned, isDesktopExpanded, onDesktopExpandedChange]);
 
   // Check for mobile on mount and window resize
   useEffect(() => {
@@ -68,16 +106,29 @@ export function Sidebar({
   }, []);
 
   const handleMouseEnter = useCallback(() => {
-    if (!isMobile && !isContextMenuOpen) {
+    if (!isMobile && !isContextMenuOpen && !isPinned) {
       onDesktopExpandedChange(true);
+      setIsExpanded(true);
     }
-  }, [isMobile, isContextMenuOpen, onDesktopExpandedChange]);
+  }, [isMobile, isContextMenuOpen, isPinned, onDesktopExpandedChange, setIsExpanded]);
 
   const handleMouseLeave = useCallback(() => {
-    if (!isMobile && !isContextMenuOpen) {
+    if (!isMobile && !isContextMenuOpen && !isPinned) {
       onDesktopExpandedChange(false);
+      setIsExpanded(false);
     }
-  }, [isMobile, isContextMenuOpen, onDesktopExpandedChange]);
+  }, [isMobile, isContextMenuOpen, isPinned, onDesktopExpandedChange, setIsExpanded]);
+
+  const togglePin = () => {
+    const newPinState = !isPinned;
+    setIsPinned(newPinState);
+    
+    // If pinning, ensure sidebar is expanded
+    if (newPinState) {
+      setIsExpanded(true);
+      onDesktopExpandedChange(true);
+    }
+  };
 
   const handleStartEdit = (threadId: string, currentTitle: string) => {
     setEditingThread(threadId);
@@ -137,6 +188,30 @@ export function Sidebar({
     }
   };
 
+  const handleThreadClick = (threadId: string) => {
+    console.log('Sidebar: handleThreadClick called with thread ID:', threadId);
+    
+    // First set the global selected thread ID
+    setSelectedThreadId(threadId);
+    
+    // Debug the current and selected thread
+    console.log('Sidebar: Current thread from context before navigation:', selectedThreadId);
+    console.log('Sidebar: Setting to thread ID:', threadId);
+    
+    // Use setTimeout to ensure context update happens before navigation
+    setTimeout(() => {
+      // Then navigate to the chat page with that thread ID
+      console.log('Sidebar: Now navigating to:', `/chat/${threadId}`);
+      navigate(`/chat/${threadId}`);
+      
+      // Also notify the parent component (for compatibility)
+      setActiveTab(threadId);
+    }, 0);
+    
+    // If on mobile, collapse the sidebar
+    if (isMobile) onDesktopExpandedChange(false);
+  };
+
   return (
     <div 
       className={cn(
@@ -147,18 +222,45 @@ export function Sidebar({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="sticky top-0 z-30 bg-background p-3 border-b">
-        <Button 
-          onClick={onNewChat} 
-          className={cn(
-            "w-full flex items-center gap-2 transition-all",
-            isDesktopExpanded ? "justify-start px-4" : "justify-center px-0"
-          )}
-          variant="default"
-        >
-          <PlusCircle className="h-5 w-5 shrink-0" />
-          {isDesktopExpanded && <span>New Chat</span>}
-        </Button>
+      <div className="sticky top-0 z-30 bg-background p-3 border-b flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <Button 
+            onClick={onNewChat} 
+            className={cn(
+              "flex-1 flex items-center gap-2 transition-all",
+              isDesktopExpanded ? "justify-start px-4" : "justify-center px-0"
+            )}
+            variant="default"
+          >
+            <PlusCircle className="h-5 w-5 shrink-0" />
+            <span className={cn(
+              "transition-opacity duration-300",
+              isDesktopExpanded ? "opacity-100" : "opacity-0 absolute overflow-hidden w-0"
+            )}>New Chat</span>
+          </Button>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  onClick={togglePin} 
+                  size="icon" 
+                  variant="ghost" 
+                  className={cn(
+                    "ml-1",
+                    !isDesktopExpanded && "hidden",
+                    isPinned && "text-orange-500"
+                  )}
+                >
+                  {isPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isPinned ? "Unpin sidebar" : "Pin sidebar open"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
       <ScrollArea className="flex-1 overflow-hidden custom-scrollbar">
@@ -203,25 +305,28 @@ export function Sidebar({
                         </div>
                       ) : (
                         <button
-                          onClick={() => {
-                            // Optimistically update the UI without waiting for the db
-                            setActiveTab(session.id);
-                            
-                            // If on mobile, collapse the sidebar
-                            if (isMobile) onDesktopExpandedChange(false);
-                          }}
+                          onClick={() => handleThreadClick(session.id)}
                           className={cn(
                             "w-full flex items-center gap-3 rounded-lg nav-item",
                             isDesktopExpanded ? "px-3 py-2" : "p-2 justify-center",
-                            currentSession === session.id && "active"
+                            currentSession === session.id ? 
+                              "bg-orange-100 text-orange-700" : 
+                              "hover:bg-muted/50"
                           )}
                         >
-                          <MessageSquare className="w-4 h-4 shrink-0" />
-                          {isDesktopExpanded && (
-                            <span className="truncate text-sm flex-1 text-left">{session.title}</span>
-                          )}
+                          <MessageSquare 
+                            className={cn(
+                              "w-4 h-4 shrink-0",
+                              currentSession === session.id && "text-[#F37022]"
+                            )} 
+                          />
+                          <span className={cn(
+                            "truncate text-sm flex-1 text-left transition-all duration-300",
+                            isDesktopExpanded ? "opacity-100 w-auto" : "opacity-0 w-0 absolute overflow-hidden",
+                            currentSession === session.id && "font-medium text-[#F37022]"
+                          )}>{session.title}</span>
                           {isDesktopExpanded && currentSession === session.id && (
-                            <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />
+                            <ChevronRight className="w-4 h-4 shrink-0 text-[#F37022]" />
                           )}
                         </button>
                       )}
@@ -249,26 +354,50 @@ export function Sidebar({
       <div className="sticky bottom-0 z-30 bg-background p-3 border-t space-y-2">
         <Link to="/flashcards">
           <Button
-            variant="ghost"
+            variant={isInFlashcards ? "default" : "ghost"}
             className={cn(
               "w-full flex items-center gap-2 transition-all",
-              isDesktopExpanded ? "justify-start px-4" : "justify-center px-0"
+              isDesktopExpanded ? "justify-start px-4" : "justify-center px-0",
+              isInFlashcards && "bg-[#F37022] hover:bg-[#E36012]"
             )}
           >
             <BookOpen className="h-4 w-4 shrink-0" />
-            {isDesktopExpanded && <span>Flashcards</span>}
+            <span className={cn(
+              "transition-opacity duration-300",
+              isDesktopExpanded ? "opacity-100" : "opacity-0 absolute overflow-hidden w-0"
+            )}>Flashcards</span>
+          </Button>
+        </Link>
+        <Link to="/chat">
+          <Button
+            variant={(isInChat || isInChatThread) ? "default" : "ghost"}
+            className={cn(
+              "w-full flex items-center gap-2 transition-all",
+              isDesktopExpanded ? "justify-start px-4" : "justify-center px-0",
+              (isInChat || isInChatThread) && "bg-[#F37022] hover:bg-[#E36012]"
+            )}
+          >
+            <MessageSquare className="h-4 w-4 shrink-0" />
+            <span className={cn(
+              "transition-opacity duration-300",
+              isDesktopExpanded ? "opacity-100" : "opacity-0 absolute overflow-hidden w-0"
+            )}>Chat</span>
           </Button>
         </Link>
         <Link to="/settings">
           <Button
-            variant="ghost"
+            variant={isInSettings ? "default" : "ghost"}
             className={cn(
               "w-full flex items-center gap-2 transition-all",
-              isDesktopExpanded ? "justify-start px-4" : "justify-center px-0"
+              isDesktopExpanded ? "justify-start px-4" : "justify-center px-0",
+              isInSettings && "bg-[#F37022] hover:bg-[#E36012]"
             )}
           >
             <Settings className="h-4 w-4 shrink-0" />
-            {isDesktopExpanded && <span>Settings</span>}
+            <span className={cn(
+              "transition-opacity duration-300",
+              isDesktopExpanded ? "opacity-100" : "opacity-0 absolute overflow-hidden w-0"
+            )}>Settings</span>
           </Button>
         </Link>
         <Button
@@ -280,7 +409,10 @@ export function Sidebar({
           )}
         >
           <LogOut className="h-4 w-4 shrink-0" />
-          {isDesktopExpanded && <span>Sign out</span>}
+          <span className={cn(
+            "transition-opacity duration-300",
+            isDesktopExpanded ? "opacity-100" : "opacity-0 absolute overflow-hidden w-0"
+          )}>Sign out</span>
         </Button>
       </div>
     </div>

@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export function SignInForm() {
   const [email, setEmail] = useState('');
@@ -175,10 +175,7 @@ export function SignInForm() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
-              </>
+              <LoadingSpinner size="sm" className="mr-2" />
             ) : (
               'Sign In'
             )}

@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Rotate3D as Rotate, BookOpen, Shuffle, Check, Edit, EyeOff, Eye, FileEdit } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Rotate3D as Rotate, BookOpen, Shuffle, Check, Edit, EyeOff, Eye, FileEdit, FolderCog, ChevronLeft, Settings, PlusCircle, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import useFlashcardAuth from '@/hooks/useFlashcardAuth';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorMessage from '../ErrorMessage';
 import Toast from '../Toast';
 import useToast from '@/hooks/useFlashcardToast';
+import Tooltip from '../Tooltip';
 
 interface Flashcard {
   id: string;
@@ -177,12 +178,12 @@ export default function StudyMode() {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
-          <Link to="/flashcards/sets" className="text-indigo-600 hover:text-indigo-700">
-            ← Back to Collections
+          <Link to="/flashcards/collections" className="text-[#F37022] hover:text-[#E36012]">
+            <ChevronLeft className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2 mt-4 mb-2">
-            <BookOpen className="h-5 w-5 text-indigo-600" />
-            <span className="text-sm font-medium text-indigo-600">{collection.subject.name}</span>
+            <BookOpen className="h-5 w-5 text-[#F37022]" />
+            <span className="text-sm font-medium text-[#F37022]">{collection.subject.name}</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">{collection.title}</h1>
         </div>
@@ -203,7 +204,7 @@ export default function StudyMode() {
             {!showMastered && (
               <button
                 onClick={() => setShowMastered(true)}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+                className="bg-[#F37022] text-white px-4 py-2 rounded-md hover:bg-[#E36012]"
               >
                 Show Mastered Cards
               </button>
@@ -245,9 +246,10 @@ export default function StudyMode() {
       
       <div className="flex justify-between items-center mb-6">
         <div>
-          <Link to="/flashcards/sets" className="text-indigo-600 hover:text-indigo-700">
-            <h1 className="text-2xl font-bold text-gray-900 hover:text-indigo-600 transition-colors">{collection.title}</h1>
+          <Link to="/flashcards/collections" className="text-[#F37022] hover:text-[#E36012]">
+            <ChevronLeft className="h-4 w-4" />
           </Link>
+          <h1 className="text-2xl font-bold text-gray-900 hover:text-[#F37022] transition-colors">{collection.title}</h1>
           {collection.description && (
             <p className="text-gray-600 mt-1">{collection.description}</p>
           )}
@@ -258,43 +260,47 @@ export default function StudyMode() {
         </div>
         
         <div className="text-right">
-          <Link to={`/flashcards/subjects/${collection.subject.id}`} className="text-indigo-600 font-medium mb-2 hover:underline block">
+          <Link to={`/flashcards/subjects/${collection.subject.id}`} className="text-[#F37022] font-medium mb-2 hover:underline block">
             {collection.subject.name}
           </Link>
           
           <div className="flex items-center gap-3 justify-end">
             {user && (
-              <Link 
-                to={`/flashcards/edit/${id}`} 
-                className="text-gray-600 hover:text-indigo-600" 
-                title="Edit Collection"
-              >
-                <Edit className="h-5 w-5" />
-              </Link>
+              <Tooltip text="Edit Collection">
+                <Link 
+                  to={`/flashcards/edit/${id}`} 
+                  className="text-gray-600 hover:text-[#F37022]"
+                >
+                  <FolderCog className="h-5 w-5" />
+                </Link>
+              </Tooltip>
             )}
             {user && (
-              <Link 
-                to={`/flashcards/manage-cards/${id}`} 
-                className="text-gray-600 hover:text-indigo-600" 
-                title="Edit Cards"
-              >
-                <FileEdit className="h-5 w-5" />
-              </Link>
+              <Tooltip text="Edit Cards">
+                <Link 
+                  to={`/flashcards/manage-cards/${id}`} 
+                  className="text-gray-600 hover:text-[#F37022]"
+                >
+                  <FileEdit className="h-5 w-5" />
+                </Link>
+              </Tooltip>
             )}
-            <button
-              onClick={() => setShowMastered(!showMastered)}
-              className="text-gray-600 hover:text-indigo-600"
-              title={showMastered ? "Hide mastered cards" : "Show all cards"}
-            >
-              {showMastered ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
-            <button
-              onClick={shuffleCards}
-              className="text-gray-600 hover:text-indigo-600"
-              title="Shuffle cards"
-            >
-              <Shuffle className="h-5 w-5" />
-            </button>
+            <Tooltip text={showMastered ? "Hide mastered cards" : "Show all cards"}>
+              <button
+                onClick={() => setShowMastered(!showMastered)}
+                className="text-gray-600 hover:text-[#F37022]"
+              >
+                {showMastered ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </Tooltip>
+            <Tooltip text="Shuffle cards">
+              <button
+                onClick={shuffleCards}
+                className="text-gray-600 hover:text-[#F37022]"
+              >
+                <Shuffle className="h-5 w-5" />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

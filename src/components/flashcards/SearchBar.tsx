@@ -153,7 +153,7 @@ export default function SearchBar() {
           }}
           onFocus={() => setShowResults(true)}
           placeholder="Search collections, subjects, cards..."
-          className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="w-full p-3 pl-10 pr-16 border border-gray-300 rounded-lg shadow-sm text-gray-500 focus:outline-none focus:ring-[#F37022] focus:border-[#F37022] sm:text-sm"
         />
         {query && (
           <button
@@ -172,7 +172,7 @@ export default function SearchBar() {
         <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md overflow-hidden">
           {isSearching ? (
             <div className="p-4 text-center text-gray-500">
-              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-[#F37022] mx-auto mb-2"></div>
               Searching...
             </div>
           ) : results.length > 0 ? (
@@ -185,9 +185,9 @@ export default function SearchBar() {
                     onClick={() => handleResultClick(result)}
                   >
                     <div className="flex items-center">
-                      {result.type === 'collection' && <Library className="h-4 w-4 text-indigo-600 mr-2" />}
-                      {result.type === 'subject' && <BookOpen className="h-4 w-4 text-indigo-600 mr-2" />}
-                      {result.type === 'card' && <FileText className="h-4 w-4 text-indigo-600 mr-2" />}
+                      {result.type === 'collection' && <Library className="h-4 w-4 text-[#F37022] mr-2" />}
+                      {result.type === 'subject' && <BookOpen className="h-4 w-4 text-[#F37022] mr-2" />}
+                      {result.type === 'card' && <FileText className="h-4 w-4 text-[#F37022] mr-2" />}
                       <div>
                         <div className="font-medium text-gray-900">{result.title}</div>
                         {result.subtitle && (
@@ -201,7 +201,7 @@ export default function SearchBar() {
               <div className="border-t border-gray-100 p-2">
                 <button 
                   onClick={handleViewAllResults}
-                  className="w-full text-center text-sm text-indigo-600 hover:text-indigo-800 py-1"
+                  className="w-full text-center text-sm text-[#F37022] hover:text-[#E36012] py-1"
                 >
                   View all results
                 </button>

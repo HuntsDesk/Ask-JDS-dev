@@ -8,17 +8,46 @@ export default function Navbar() {
   const { user } = useFlashcardAuth();
   const location = useLocation();
 
+  // Determine create button text and link based on current page
+  const getCreateConfig = () => {
+    const path = location.pathname;
+    
+    if (path === '/flashcards/collections' || path.startsWith('/flashcards/collections')) {
+      return {
+        text: 'New Collection',
+        link: '/flashcards/create'
+      };
+    } else if (path === '/flashcards/subjects' || path.startsWith('/flashcards/subjects/')) {
+      return {
+        text: 'New Subject',
+        link: '/flashcards/create-subject'
+      };
+    } else if (path === '/flashcards/flashcards') {
+      return {
+        text: 'New Flashcard',
+        link: '/flashcards/create-flashcard'
+      };
+    } else {
+      return {
+        text: 'Create',
+        link: '/flashcards/create'
+      };
+    }
+  };
+
+  const createConfig = getCreateConfig();
+
   return (
-    <nav className="bg-white shadow-lg">
-      <div className="container mx-auto px-4">
+    <nav className="bg-white shadow-lg sticky top-0 z-10 w-full">
+      <div className="max-w-full px-4">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-6">
             <Link 
-              to="/flashcards/sets" 
+              to="/flashcards/collections" 
               className={`flex items-center space-x-1 ${
-                location.pathname === '/flashcards/sets' || location.pathname.includes('/flashcards/study/')
-                  ? 'text-indigo-600 font-medium' 
-                  : 'text-gray-600 hover:text-indigo-600'
+                location.pathname === '/flashcards/collections' || location.pathname.includes('/flashcards/study/')
+                  ? 'text-[#F37022] font-medium' 
+                  : 'text-gray-600 hover:text-[#F37022]'
               }`}
             >
               <Library className="h-5 w-5" />
@@ -29,8 +58,8 @@ export default function Navbar() {
               to="/flashcards/subjects" 
               className={`flex items-center space-x-1 ${
                 location.pathname === '/flashcards/subjects' || location.pathname.includes('/flashcards/subjects/') 
-                  ? 'text-indigo-600 font-medium' 
-                  : 'text-gray-600 hover:text-indigo-600'
+                  ? 'text-[#F37022] font-medium' 
+                  : 'text-gray-600 hover:text-[#F37022]'
               }`}
             >
               <BookOpen className="h-5 w-5" />
@@ -41,8 +70,8 @@ export default function Navbar() {
               to="/flashcards/flashcards" 
               className={`flex items-center space-x-1 ${
                 location.pathname === '/flashcards/flashcards' 
-                  ? 'text-indigo-600 font-medium' 
-                  : 'text-gray-600 hover:text-indigo-600'
+                  ? 'text-[#F37022] font-medium' 
+                  : 'text-gray-600 hover:text-[#F37022]'
               }`}
             >
               <FileText className="h-5 w-5" />
@@ -57,15 +86,11 @@ export default function Navbar() {
           <div className="flex items-center">
             {user && (
               <Link 
-                to="/flashcards/create" 
-                className={`flex items-center space-x-1 ${
-                  location.pathname === '/flashcards/create' 
-                    ? 'text-indigo-600 font-medium' 
-                    : 'text-gray-600 hover:text-indigo-600'
-                }`}
+                to={createConfig.link} 
+                className="flex items-center gap-1 bg-[#F37022] text-white px-3 py-1.5 rounded-md hover:bg-[#E36012]"
               >
-                <PlusCircle className="h-5 w-5" />
-                <span>Create</span>
+                <PlusCircle className="h-4 w-4" />
+                <span>{createConfig.text}</span>
               </Link>
             )}
           </div>

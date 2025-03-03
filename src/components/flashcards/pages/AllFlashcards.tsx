@@ -243,7 +243,7 @@ export default function AllFlashcards() {
                   setFilterSubject(e.target.value);
                   setFilterCollection('all'); // Reset collection filter when subject changes
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
               >
                 <option value="all">All Subjects</option>
                 {subjects.map((subject) => (
@@ -262,7 +262,7 @@ export default function AllFlashcards() {
                 id="collection-filter"
                 value={filterCollection}
                 onChange={(e) => setFilterCollection(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
               >
                 <option value="all">All Collections</option>
                 {getFilteredCollections().map((collection) => (
@@ -296,7 +296,7 @@ export default function AllFlashcards() {
                   <div>
                     <Link 
                       to={`/flashcards/study/${card.collection_id}`}
-                      className="text-sm font-medium text-indigo-600 hover:underline"
+                      className="text-sm font-medium text-[#F37022] hover:underline"
                     >
                       {card.collection.title}
                     </Link>
@@ -304,7 +304,7 @@ export default function AllFlashcards() {
                       <BookOpen className="h-4 w-4 mr-1" />
                       <Link 
                         to={`/flashcards/subjects/${card.collection.subject.id}`}
-                        className="hover:text-indigo-600 hover:underline"
+                        className="hover:text-[#F37022] hover:underline"
                       >
                         {card.collection.subject.name}
                       </Link>
@@ -327,7 +327,7 @@ export default function AllFlashcards() {
                       <>
                         <button
                           onClick={() => handleEditCard(card)}
-                          className="p-1 rounded-full text-gray-600 hover:text-indigo-600 hover:bg-indigo-100"
+                          className="p-1 rounded-full text-gray-600 hover:text-[#F37022] hover:bg-[#F37022]/10"
                           title="Edit card"
                         >
                           <FileEdit className="h-5 w-5" />

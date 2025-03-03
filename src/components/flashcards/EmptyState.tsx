@@ -31,7 +31,7 @@ export default function EmptyState({
       {actionText && actionLink && (
         <Link
           to={actionLink}
-          className="inline-flex items-center justify-center bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700"
+          className="inline-flex items-center justify-center bg-[#F37022] text-white px-6 py-3 rounded-md hover:bg-[#E36012]"
         >
           {actionText}
         </Link>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, Trash2, Check, Eye, EyeOff, FileEdit } from 'lucide-react';
+import { ArrowLeft, Trash2, Check, Eye, EyeOff, FileEdit, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DeleteConfirmation from '../DeleteConfirmation';
 import Toast from '../Toast';
@@ -169,7 +169,7 @@ export default function ManageCards() {
       <ErrorMessage 
         message={error || 'Collection not found'} 
         backLink={{
-          to: "/flashcards/sets",
+          to: "/flashcards/collections",
           label: "Back to Collections"
         }}
       />
@@ -197,8 +197,8 @@ export default function ManageCards() {
       )}
       
       <div className="mb-8">
-        <Link to={`/flashcards/edit/${id}`} className="text-indigo-600 hover:text-indigo-700 flex items-center gap-2">
-          <ArrowLeft className="h-5 w-5" />
+        <Link to={`/flashcards/edit/${id}`} className="text-[#F37022] hover:text-[#E36012] flex items-center gap-2">
+          <ChevronLeft className="h-5 w-5" />
           Back to Collection
         </Link>
         <h1 className="text-3xl font-bold text-gray-900 mt-4">Manage Flashcards</h1>
@@ -212,7 +212,7 @@ export default function ManageCards() {
           <h2 className="text-xl font-semibold text-gray-900">Flashcards</h2>
           <button
             onClick={() => setShowMastered(!showMastered)}
-            className="flex items-center gap-2 text-gray-600 hover:text-indigo-600"
+            className="flex items-center gap-2 text-gray-600 hover:text-[#F37022]"
           >
             {showMastered ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             {showMastered ? 'Hide Mastered Cards' : 'Show Mastered Cards'}
@@ -266,7 +266,7 @@ export default function ManageCards() {
                       type="text"
                       value={card.question}
                       onChange={(e) => updateCard(card.id, 'question', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                     />
                   </div>
                   <div>
@@ -274,7 +274,7 @@ export default function ManageCards() {
                     <textarea
                       value={card.answer}
                       onChange={(e) => updateCard(card.id, 'answer', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
                       rows={3}
                     />
                   </div>
@@ -288,7 +288,7 @@ export default function ManageCards() {
       <div className="flex justify-between">
         <Link
           to={`/flashcards/add-card/${id}`}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+          className="bg-[#F37022] text-white px-4 py-2 rounded-md hover:bg-[#E36012]"
         >
           Add More Cards
         </Link>

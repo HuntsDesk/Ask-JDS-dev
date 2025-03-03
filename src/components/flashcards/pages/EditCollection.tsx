@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Save, ArrowLeft, Trash2, PlusCircle } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, PlusCircle, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DeleteConfirmation from '../DeleteConfirmation';
 import Toast from '../Toast';
@@ -134,7 +134,7 @@ export default function EditCollection() {
         .eq('id', id);
 
       if (error) throw error;
-      navigate('/flashcards/sets');
+      navigate('/flashcards/collections');
     } catch (err: any) {
       setError(err.message);
       showToast(`Error: ${err.message}`, 'error');
@@ -166,7 +166,7 @@ export default function EditCollection() {
       <ErrorMessage 
         message={error || 'Collection not found'} 
         backLink={{
-          to: "/flashcards/sets",
+          to: "/flashcards/collections",
           label: "Back to Collections"
         }}
       />
@@ -194,8 +194,8 @@ export default function EditCollection() {
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <Link to="/flashcards/sets" className="text-indigo-600 hover:text-indigo-700 flex items-center gap-2">
-            <ArrowLeft className="h-5 w-5" />
+          <Link to="/flashcards/collections" className="text-[#F37022] hover:text-[#E36012] flex items-center gap-2">
+            <ChevronLeft className="h-5 w-5" />
             Back to Collections
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 mt-4">Edit Collection</h1>
@@ -219,7 +219,7 @@ export default function EditCollection() {
               id="subject"
               value={collection.subject_id}
               onChange={(e) => setCollection({ ...collection, subject_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
               required
             >
               {subjects.map((subject) => (
@@ -239,7 +239,7 @@ export default function EditCollection() {
               id="title"
               value={collection.title}
               onChange={(e) => setCollection({ ...collection, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
               required
             />
           </div>
@@ -252,7 +252,7 @@ export default function EditCollection() {
               id="description"
               value={collection.description}
               onChange={(e) => setCollection({ ...collection, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
               rows={3}
             />
           </div>
@@ -261,7 +261,7 @@ export default function EditCollection() {
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Flashcards</h2>
-            <span className="text-gray-600">{cardCount} cards in this collection</span>
+            <span className="text-gray-600">{cardCount} cards</span>
           </div>
           
           <div className="space-y-4">
@@ -269,18 +269,18 @@ export default function EditCollection() {
               <button
                 type="button"
                 onClick={() => handleNavigation(`/flashcards/add-card/${id}`)}
-                className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex-1"
+                className="flex items-center justify-center gap-2 bg-[#F37022] text-white px-4 py-2 rounded-md hover:bg-[#E36012] flex-1"
               >
                 <PlusCircle className="h-5 w-5" />
-                Add New Cards
+                Add New Card
               </button>
               
               <button
                 type="button"
-                onClick={() => handleNavigation(`/flashcards/manage/${id}`)}
+                onClick={() => handleNavigation(`/flashcards/manage-cards/${id}`)}
                 className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 flex-1"
               >
-                Manage All Cards
+                Manage Collection Cards
               </button>
             </div>
           </div>
@@ -292,12 +292,12 @@ export default function EditCollection() {
             disabled={saving || !hasUnsavedChanges}
             className={`flex items-center gap-2 px-6 py-2 rounded-md ${
               hasUnsavedChanges 
-                ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                ? 'bg-[#F37022] text-white hover:bg-[#E36012]' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
             <Save className="h-5 w-5" />
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? 'Saving...' : 'Save & Close'}
           </button>
         </div>
       </form>

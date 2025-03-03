@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, createContext, useContext } from 'react';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { Toaster } from '@/components/ui/toaster';
 import { ChatLayout } from '@/components/chat/ChatLayout';
@@ -22,12 +22,92 @@ import { Button } from '@/components/ui/button';
 import FlashcardsPage from '@/components/flashcards/FlashcardsPage';
 import { AlertTriangle } from 'lucide-react';
 
+// Create a context for the selected thread
+export const SelectedThreadContext = createContext<{
+  selectedThreadId: string | null;
+  setSelectedThreadId: (id: string | null) => void;
+}>({
+  selectedThreadId: null,
+  setSelectedThreadId: () => {},
+});
+
+// Create a context for sidebar state management
+export const SidebarContext = createContext<{
+  isPinned: boolean;
+  setIsPinned: (isPinned: boolean) => void;
+  isExpanded: boolean;
+  setIsExpanded: (isExpanded: boolean) => void;
+}>({
+  isPinned: false,
+  setIsPinned: () => {},
+  isExpanded: false,
+  setIsExpanded: () => {},
+});
+
+// Provider component for the selected thread
+function SelectedThreadProvider({ children }: { children: React.ReactNode }) {
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  
+  // Log changes to the selected thread for debugging
+  useEffect(() => {
+    console.log('Global thread selection changed to:', selectedThreadId);
+  }, [selectedThreadId]);
+  
+  return (
+    <SelectedThreadContext.Provider value={{ selectedThreadId, setSelectedThreadId }}>
+      {children}
+    </SelectedThreadContext.Provider>
+  );
+}
+
+// Provider component for sidebar state
+function SidebarProvider({ children }: { children: React.ReactNode }) {
+  // Initialize with localStorage values if available
+  const [isPinned, setIsPinned] = useState<boolean>(() => {
+    const storedValue = localStorage.getItem('sidebar-pinned');
+    return storedValue ? storedValue === 'true' : false;
+  });
+  
+  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+    return isPinned; // Start expanded if pinned
+  });
+  
+  // Save pinned state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('sidebar-pinned', isPinned.toString());
+    
+    // If we're pinning, also expand
+    if (isPinned && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [isPinned, isExpanded]);
+  
+  return (
+    <SidebarContext.Provider value={{ 
+      isPinned, 
+      setIsPinned, 
+      isExpanded, 
+      setIsExpanded 
+    }}>
+      {children}
+    </SidebarContext.Provider>
+  );
+}
+
 // Create router with future flags
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
       <Route path="/" element={<HomePage />} />
       <Route path="/auth" element={<AuthPage />} />
+      <Route 
+        path="/chat/:id" 
+        element={
+          <ProtectedRoute>
+            <ChatLayout />
+          </ProtectedRoute>
+        } 
+      />
       <Route 
         path="/chat" 
         element={
@@ -63,137 +143,7 @@ const router = createBrowserRouter(
   }
 );
 
-// Wrapper component to handle auth state
-function AppRoutes() {
-  const { user, loading, authInitialized } = useAuth();
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [networkStatus, setNetworkStatus] = useState<'online' | 'offline'>(
-    typeof navigator !== 'undefined' && navigator.onLine ? 'online' : 'offline'
-  );
-  
-  // Monitor network status
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('Network is now online');
-      setNetworkStatus('online');
-    };
-    
-    const handleOffline = () => {
-      console.log('Network is now offline');
-      setNetworkStatus('offline');
-    };
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-  
-  // Add a safety timeout to prevent getting stuck in loading state
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
-    
-    if ((loading || !authInitialized) && !loadingTimeout) {
-      console.log('AppRoutes: Setting loading safety timeout');
-      timeoutId = setTimeout(() => {
-        console.log('AppRoutes: Loading safety timeout triggered');
-        setLoadingTimeout(true);
-        
-        // If we still don't have auth initialized, force a refresh
-        if (!authInitialized && typeof window !== 'undefined') {
-          console.log('AppRoutes: Auth still not initialized after timeout, checking browser storage');
-          
-          // Check if we have a session in local storage
-          const hasSession = localStorage.getItem('ask-jds-auth-storage') !== null;
-          console.log('AppRoutes: Session in local storage:', hasSession);
-        }
-      }, 8000); // Increase to 8 seconds to give auth more time
-    }
-    
-    return () => {
-      if (timeoutId) {
-        console.log('AppRoutes: Clearing loading safety timeout');
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [loading, authInitialized, loadingTimeout]);
-  
-  useEffect(() => {
-    console.log('AppRoutes: Auth state', { 
-      user: user?.email, 
-      loading, 
-      authInitialized,
-      loadingTimeout,
-      networkStatus
-    });
-    
-    // Force check session if we're stuck in loading
-    if (loadingTimeout && (loading || !authInitialized)) {
-      console.log('AppRoutes: Forcing route rendering due to timeout');
-    }
-  }, [user, loading, authInitialized, loadingTimeout, networkStatus]);
-  
-  // Show a network error message if offline
-  if (networkStatus === 'offline') {
-    return (
-      <>
-        <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
-          <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full text-center">
-            <h2 className="text-xl font-bold mb-4">Network Connection Issue</h2>
-            <p className="mb-4">
-              You appear to be offline. Please check your internet connection and try again.
-            </p>
-            <Button 
-              onClick={() => window.location.reload()}
-              className="w-full"
-            >
-              Retry Connection
-            </Button>
-          </div>
-        </div>
-        <OfflineIndicator />
-      </>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
-        <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full text-center">
-          <h2 className="text-xl font-bold mb-4">Something went wrong</h2>
-          <p className="mb-4 text-red-500">{error.message}</p>
-          <pre className="bg-gray-100 p-2 rounded text-left overflow-auto max-h-40 mb-4">{error.stack}</pre>
-          <Button 
-            onClick={() => window.location.reload()}
-            className="w-full"
-          >
-            Reload Application
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  
-  try {
-    // Render the app immediately without waiting for auth to initialize
-    return (
-      <>
-        <RouterProvider router={router} />
-        <Toaster />
-        <OfflineIndicator />
-      </>
-    );
-  } catch (err) {
-    console.error('Error rendering app:', err);
-    setError(err instanceof Error ? err : new Error(String(err)));
-    return null;
-  }
-}
-
+// Wrapper function for the entire app
 function App() {
   const [loading, setLoading] = useState(true);
   const auth = useAuth();
@@ -257,26 +207,34 @@ function App() {
       </div>
     );
   }
-  
+
   return (
-    <ErrorBoundary fallback={
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full text-center">
-          <h2 className="text-xl font-bold mb-4">Application Error</h2>
-          <p className="mb-4">
-            The application encountered an unexpected error. Please try refreshing the page.
-          </p>
-          <Button 
-            onClick={() => window.location.reload()}
-            className="w-full"
-          >
-            Reload Application
-          </Button>
+    <ErrorBoundary
+      fallback={
+        <div className="fixed inset-0 flex items-center justify-center bg-background">
+          <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full text-center">
+            <h2 className="text-xl font-bold mb-4">Application Error</h2>
+            <p className="mb-4">
+              The application encountered an unexpected error. Please try refreshing the page.
+            </p>
+            <Button 
+              onClick={() => window.location.reload()}
+              className="w-full"
+            >
+              Reload Application
+            </Button>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <AuthProvider>
-        <AppRoutes />
+        <SelectedThreadProvider>
+          <SidebarProvider>
+            <RouterProvider router={router} />
+            <Toaster />
+            <OfflineIndicator />
+          </SidebarProvider>
+        </SelectedThreadProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

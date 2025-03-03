@@ -207,7 +207,7 @@ export default function SearchResults() {
       )}
       
       <div className="mb-6">
-        <Link to="/flashcards" className="flex items-center text-indigo-600 hover:text-indigo-800">
+        <Link to="/flashcards" className="flex items-center text-[#F37022] hover:text-[#E36012]">
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to Flashcards
         </Link>
@@ -226,7 +226,7 @@ export default function SearchResults() {
           {collections.length > 0 && (
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Library className="h-5 w-5 mr-2 text-indigo-600" />
+                <Library className="h-5 w-5 mr-2 text-[#F37022]" />
                 Collections ({collections.length})
               </h2>
               
@@ -236,7 +236,7 @@ export default function SearchResults() {
                     <div className="p-4">
                       <Link 
                         to={`/flashcards/study/${collection.id}`}
-                        className="text-lg font-medium text-indigo-600 hover:underline"
+                        className="text-lg font-medium text-[#F37022] hover:underline"
                       >
                         {collection.title}
                       </Link>
@@ -244,7 +244,7 @@ export default function SearchResults() {
                         <BookOpen className="h-4 w-4 mr-1" />
                         <Link 
                           to={`/flashcards/subjects/${collection.subject.id}`}
-                          className="hover:text-indigo-600 hover:underline"
+                          className="hover:text-[#F37022] hover:underline"
                         >
                           {collection.subject.name}
                         </Link>

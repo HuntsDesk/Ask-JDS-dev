@@ -68,7 +68,7 @@ export default function FlashcardSubjects() {
   }
 
   const handleAddSubject = () => {
-    navigate('/flashcards/create?newSubject=true');
+    navigate('/flashcards/create-subject');
   };
 
   const handleDeleteSubject = async () => {
@@ -124,15 +124,6 @@ export default function FlashcardSubjects() {
 
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Subjects</h1>
-        <div className="flex gap-4">
-          <button
-            onClick={handleAddSubject}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-          >
-            <Plus className="h-5 w-5" />
-            Add Subject
-          </button>
-        </div>
       </div>
       
       {error && (

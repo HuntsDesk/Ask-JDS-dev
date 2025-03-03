@@ -272,16 +272,16 @@ export default function FlashcardStudy() {
               <p className="text-2xl font-bold text-red-700">{stats.incorrect}</p>
               <p className="text-sm text-red-600">Incorrect</p>
             </div>
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <p className="text-2xl font-bold text-purple-700">{score}%</p>
-              <p className="text-sm text-purple-600">Score</p>
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <p className="text-2xl font-bold text-[#F37022]">{score}%</p>
+              <p className="text-sm text-[#F37022]">Score</p>
             </div>
           </div>
           
           <div className="flex flex-col md:flex-row gap-4 justify-center">
             <button
               onClick={handleRestartStudy}
-              className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700"
+              className="flex items-center justify-center gap-2 bg-[#F37022] text-white px-6 py-3 rounded-md hover:bg-[#E36012]"
             >
               <RotateCcw className="h-5 w-5" />
               Study Again
@@ -337,9 +337,9 @@ export default function FlashcardStudy() {
           <p className="text-xl font-bold text-red-700">{stats.incorrect}</p>
           <p className="text-xs text-red-600">Incorrect</p>
         </div>
-        <div className="bg-purple-50 p-3 rounded-lg text-center">
-          <p className="text-xl font-bold text-purple-700">{stats.mastered}</p>
-          <p className="text-xs text-purple-600">Mastered</p>
+        <div className="bg-orange-50 p-3 rounded-lg text-center">
+          <p className="text-xl font-bold text-[#F37022]">{stats.mastered}</p>
+          <p className="text-xs text-[#F37022]">Mastered</p>
         </div>
       </div>
       

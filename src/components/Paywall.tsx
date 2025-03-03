@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { createCheckoutSession, FREE_MESSAGE_LIMIT } from '@/lib/subscription';
-import { Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 
 interface PaywallProps {
@@ -111,10 +111,7 @@ export function Paywall({ onCancel }: PaywallProps) {
             disabled={isLoading}
           >
             {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
+              <LoadingSpinner size="sm" className="mr-2" />
             ) : (
               'Upgrade Now'
             )}

@@ -22,6 +22,7 @@ interface FlashcardCollection {
     id: string;
     name: string;
   };
+  mastered_count: number;
 }
 
 interface Subject {
@@ -83,19 +84,30 @@ export default function FlashcardCollections() {
       
       if (error) throw error;
       
-      // Get card counts for each collection
+      // Get card counts and mastered counts for each collection
       const collectionsWithCounts = await Promise.all(
         (data || []).map(async (collection) => {
-          const { count, error: countError } = await supabase
+          // Get total card count
+          const { count: totalCount, error: countError } = await supabase
             .from('flashcards')
             .select('*', { count: 'exact', head: true })
             .eq('collection_id', collection.id);
             
           if (countError) throw countError;
           
+          // Get mastered card count
+          const { count: masteredCount, error: masteredError } = await supabase
+            .from('flashcards')
+            .select('*', { count: 'exact', head: true })
+            .eq('collection_id', collection.id)
+            .eq('is_mastered', true);
+            
+          if (masteredError) throw masteredError;
+          
           return {
             ...collection,
-            card_count: count || 0
+            card_count: totalCount || 0,
+            mastered_count: masteredCount || 0
           };
         })
       );
@@ -214,87 +226,33 @@ export default function FlashcardCollections() {
 
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
-          {selectedSubject ? `${selectedSubject.name} Collections` : 'All Collections'}
+          {selectedSubject ? `${selectedSubject.name} Collections` : 'My Collections'}
         </h1>
-        <button
-          onClick={() => navigate('/flashcards/create')}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          <Plus className="h-5 w-5" />
-          Create Collection
-        </button>
-      </div>
-      
-      <div className="flex flex-col md:flex-row gap-6 mb-8">
-        <div className="w-full md:w-2/3">
-          <form onSubmit={handleSearch} className="relative">
-            <input
-              type="text"
-              placeholder="Search collections..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-          </form>
-        </div>
-        
-        <div className="w-full md:w-1/3">
-          <div className="relative">
-            <select
-              value={selectedSubjectId}
-              onChange={(e) => handleSubjectFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-            >
-              <option value="">All Subjects</option>
-              {subjects.map(subject => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name}
-                </option>
-              ))}
-            </select>
-            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-          </div>
-        </div>
-      </div>
-      
-      {officialCollections.length > 0 && (
-        <div className="mb-12">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Official Collections</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {officialCollections.map(collection => (
-              <Card 
-                key={collection.id}
-                title={collection.title}
-                description={collection.description}
-                tag={collection.subject.name}
-                count={collection.card_count || 0}
-                link={`/flashcards/study/${collection.id}`}
-                collectionId={collection.id}
-                isOfficial={true}
-                subjectId={collection.subject.id}
-              />
+        <div className="relative">
+          <select
+            value={selectedSubjectId}
+            onChange={(e) => handleSubjectFilter(e.target.value)}
+            className="w-40 pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+          >
+            <option value="">All Subjects</option>
+            {subjects.map(subject => (
+              <option key={subject.id} value={subject.id}>
+                {subject.name}
+              </option>
             ))}
-          </div>
+          </select>
+          <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
         </div>
-      )}
-
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-6">My Collections</h2>
-        {userCollections.length === 0 ? (
+      </div>
+      
+      <div className="mb-8">
+        {userCollections.length === 0 && officialCollections.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow-sm">
             <Library className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">No collections yet</h3>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No collections found</h3>
             <p className="text-gray-500 mb-4">
-              Create your first collection to start studying
+              Create your first collection using the New Collection button in the navigation bar.
             </p>
-            <button
-              onClick={() => navigate('/flashcards/create')}
-              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700"
-            >
-              <Plus className="h-5 w-5" />
-              Create Collection
-            </button>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -305,10 +263,25 @@ export default function FlashcardCollections() {
                 description={collection.description}
                 tag={collection.subject.name}
                 count={collection.card_count || 0}
+                masteredCount={collection.mastered_count || 0}
                 link={`/flashcards/study/${collection.id}`}
                 onDelete={() => setCollectionToDelete(collection)}
                 collectionId={collection.id}
                 isOfficial={false}
+                subjectId={collection.subject.id}
+              />
+            ))}
+            {officialCollections.map(collection => (
+              <Card 
+                key={collection.id}
+                title={collection.title}
+                description={collection.description}
+                tag={collection.subject.name}
+                count={collection.card_count || 0}
+                masteredCount={collection.mastered_count || 0}
+                link={`/flashcards/study/${collection.id}`}
+                collectionId={collection.id}
+                isOfficial={true}
                 subjectId={collection.subject.id}
               />
             ))}

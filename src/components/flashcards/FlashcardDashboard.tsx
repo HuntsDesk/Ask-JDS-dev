@@ -209,8 +209,8 @@ export default function FlashcardDashboard() {
       <div className="mb-12">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-gray-900">Recent Sets</h2>
-          <Link to="/flashcards/collections" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-            View All Sets
+          <Link to="/flashcards/collections" className="text-[#F37022] hover:text-[#E36012] text-sm font-medium">
+            View All Collections
           </Link>
         </div>
         
@@ -242,8 +242,8 @@ export default function FlashcardDashboard() {
       <div className="mb-12">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-gray-900">Popular Sets</h2>
-          <Link to="/flashcards/collections" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-            View All Sets
+          <Link to="/flashcards/collections" className="text-[#F37022] hover:text-[#E36012] text-sm font-medium">
+            View All Collections
           </Link>
         </div>
         

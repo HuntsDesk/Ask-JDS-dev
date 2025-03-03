@@ -15,7 +15,8 @@ import {
   FileEdit, 
   PlusCircle, 
   Rotate3D, 
-  Shuffle 
+  Shuffle, 
+  ChevronLeft 
 } from 'lucide-react';
 
 interface Flashcard {
@@ -220,7 +221,7 @@ export default function SubjectStudy() {
   if (error || !subject) {
     return (
       <ErrorMessage message={error || 'Subject not found'}>
-        <Link to="/flashcards/subjects" className="text-indigo-600 hover:text-indigo-800">
+        <Link to="/flashcards/subjects" className="text-[#F37022] hover:text-[#E36012]">
           Back to Subjects
         </Link>
       </ErrorMessage>
