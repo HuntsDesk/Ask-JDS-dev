@@ -66,3 +66,41 @@ export interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<{ error: Error | null }>;
 }
+
+// Flashcard Types
+export interface Subject {
+  id: string;
+  name: string;
+  description: string;
+  is_official: boolean;
+  created_at: string;
+  user_id: string;
+}
+
+export interface FlashcardCollection {
+  id: string;
+  title: string;
+  description: string;
+  subject_id: string;
+  created_at: string;
+  user_id: string;
+  subject?: Subject;
+  flashcards_count?: number;
+}
+
+export interface Flashcard {
+  id: string;
+  question: string;
+  answer: string;
+  is_mastered: boolean;
+  collection_id: string;
+  created_at: string;
+  user_id: string;
+  collection?: {
+    title: string;
+    subject?: {
+      name: string;
+      id: string;
+    }
+  };
+}

@@ -282,15 +282,7 @@ export function AuthForm({ initialTab = 'signin' }: AuthFormProps) {
                           </div>
                           
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <Checkbox id="remember" />
-                                <Label htmlFor="remember" className="text-xs sm:text-sm">Remember me</Label>
-                              </div>
-                              <Link to="/auth/reset-password" className="text-xs sm:text-sm text-[#F37022] hover:underline">
-                                Forgot password?
-                              </Link>
-                            </div>
+                            <Label htmlFor="signin-password">Password</Label>
                             <div className="relative">
                               <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                               <Input
@@ -307,6 +299,16 @@ export function AuthForm({ initialTab = 'signin' }: AuthFormProps) {
                                 required
                               />
                             </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="remember" />
+                              <Label htmlFor="remember" className="text-xs sm:text-sm">Remember me</Label>
+                            </div>
+                            <Link to="/auth/reset-password" className="text-xs sm:text-sm text-[#F37022] hover:underline">
+                              Forgot password?
+                            </Link>
                           </div>
                           
                           <Button 

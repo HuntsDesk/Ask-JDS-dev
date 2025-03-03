@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { withTimeout } from './auth-utils';
+import { withTimeout, fetchWithRetry } from './auth-utils';
 
 // Constants
 export const FREE_MESSAGE_LIMIT = 10;
@@ -10,14 +10,24 @@ export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'trialing'
 
 export interface Subscription {
   id: string;
+  userId?: string;
   status: SubscriptionStatus;
-  current_period_end: string;
-  cancel_at_period_end: boolean;
+  priceId?: string;
+  productId?: string;
+  interval?: string;
+  intervalCount?: number;
+  created?: Date;
+  periodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  trialEnd?: Date | null;
 }
 
-// Cache for message counts to avoid repeated fetches
+// Cache for message counts and subscription to avoid repeated fetches
 const messageCountCache = new Map<string, { count: number, timestamp: number }>();
 const CACHE_TTL = 60 * 1000; // 1 minute
+
+// Cache for subscription data
+let cachedSubscription: Subscription | null = null;
 
 // Flag to track if we've already logged database errors
 let hasLoggedDatabaseErrors = false;
@@ -51,11 +61,16 @@ function handleDatabaseError(error: any, context: string): void {
  * Get the current user's message count for the current period
  */
 export async function getUserMessageCount(userId?: string): Promise<number> {
+  let timeoutId: NodeJS.Timeout | null = null;
+  let hasReturnedValue = false;
+
   // Create a timeout promise that resolves to 0 instead of rejecting
   const timeoutPromise = new Promise<number>((resolve) => {
-    setTimeout(() => {
-      console.warn('Message count check timed out, returning 0');
-      resolve(0);
+    timeoutId = setTimeout(() => {
+      if (!hasReturnedValue) {
+        console.warn('Message count check timed out, returning 0');
+        resolve(0);
+      }
     }, 8000); // 8 second timeout (increased from 5 seconds)
   });
 
@@ -67,6 +82,8 @@ export async function getUserMessageCount(userId?: string): Promise<number> {
       
       if (!userId) {
         console.warn('No user ID available for getting message count');
+        hasReturnedValue = true;
+        if (timeoutId) clearTimeout(timeoutId);
         return 0;
       }
     }
@@ -77,6 +94,8 @@ export async function getUserMessageCount(userId?: string): Promise<number> {
     const cached = messageCountCache.get(userId);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       console.log(`Using cached message count for user ${userId}: ${cached.count}`);
+      hasReturnedValue = true;
+      if (timeoutId) clearTimeout(timeoutId);
       return cached.count;
     }
     
@@ -84,39 +103,36 @@ export async function getUserMessageCount(userId?: string): Promise<number> {
     try {
       console.log(`Calling get_user_message_count RPC for user ${userId}`);
       // Always pass the user_id parameter to avoid ambiguity with overloaded functions
-      let count;
-      try {
-        const result = await Promise.race([
-          supabase.rpc('get_user_message_count', { user_id: userId }),
-          timeoutPromise
-        ]);
+      const result = await Promise.race([
+        supabase.rpc('get_user_message_count', { user_id: userId }),
+        timeoutPromise
+      ]);
+      
+      // If result is a number, it came from the timeout promise
+      if (typeof result === 'number') {
+        hasReturnedValue = true;
+        return result;
+      }
+      
+      const count = result.data;
+      const rpcError = result.error;
+      
+      if (!rpcError && typeof count === 'number') {
+        console.log(`RPC returned message count for user ${userId}: ${count}`);
+        // Cache the result
+        messageCountCache.set(userId, {
+          count,
+          timestamp: Date.now()
+        });
         
-        // If result is a number, it came from the timeout promise
-        if (typeof result === 'number') {
-          return result;
-        }
-        
-        count = result.data;
-        const rpcError = result.error;
-        
-        if (!rpcError && typeof count === 'number') {
-          console.log(`RPC returned message count for user ${userId}: ${count}`);
-          // Cache the result
-          messageCountCache.set(userId, {
-            count,
-            timestamp: Date.now()
-          });
-          
-          return count;
-        }
-        
-        if (rpcError) {
-          console.error(`RPC error for get_user_message_count: ${rpcError.message}`, rpcError);
-          handleDatabaseError(rpcError, 'getUserMessageCount (RPC)');
-        }
-      } catch (timeoutErr) {
-        console.error('Message count RPC check error:', timeoutErr);
-        return 0;
+        hasReturnedValue = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        return count;
+      }
+      
+      if (rpcError) {
+        console.error(`RPC error for get_user_message_count: ${rpcError.message}`, rpcError);
+        handleDatabaseError(rpcError, 'getUserMessageCount (RPC)');
       }
     } catch (rpcErr) {
       console.error(`Exception in get_user_message_count RPC: ${rpcErr}`);
@@ -316,122 +332,184 @@ export async function hasReachedFreeMessageLimit(userId?: string): Promise<boole
 }
 
 /**
- * Get the user's current subscription
+ * Get the user's subscription
  */
-export async function getUserSubscription(userId?: string): Promise<Subscription | null> {
-  // Create a timeout promise that resolves to null instead of rejecting
-  const timeoutPromise = new Promise<null>((resolve) => {
-    setTimeout(() => {
-      console.warn('Subscription check timed out, returning null');
-      resolve(null);
-    }, 8000); // 8 second timeout (increased from 5 seconds)
-  });
-
-  try {
-    // If no userId provided, get the current user
-    if (!userId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      userId = user?.id;
-      
-      if (!userId) {
-        console.warn('No user ID available for getting subscription');
-        return null;
-      }
-    }
-    
-    console.log(`Getting subscription for user: ${userId}`);
-    
-    // Check if user is admin, admins have unlimited access
-    try {
-      let session;
-      try {
-        const result = await Promise.race([
-          supabase.auth.getSession(),
-          timeoutPromise
-        ]);
-        
-        // If result is null, it came from the timeout promise
-        if (result === null) {
-          console.warn('Session check timed out during subscription check');
-          // Continue to check subscription in database
-        } else {
-          session = result.data.session;
-        }
-      } catch (timeoutErr) {
-        console.error('Session check error during subscription check:', timeoutErr);
-        // Continue to check subscription in database
-      }
-      
-      if (session?.user?.user_metadata?.is_admin === true) {
-        console.log('User is admin, returning admin subscription');
-        return {
-          id: 'admin',
-          status: 'active',
-          current_period_end: '9999-12-31T23:59:59Z',
-          cancel_at_period_end: false
-        };
-      }
-    } catch (sessionErr) {
-      console.error('Error checking admin status:', sessionErr);
-      // Continue to check subscription in database
-    }
-    
-    // Get the most recent active subscription
-    try {
-      let data;
-      let error;
-      
-      try {
-        const result = await Promise.race([
-          supabase
-            .from('user_subscriptions')
-            .select('*')
-            .eq('user_id', userId)
-            .in('status', ['active', 'trialing'])
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single(),
-          timeoutPromise
-        ]);
-        
-        // If result is null, it came from the timeout promise
-        if (result === null) {
-          console.warn('Subscription database check timed out');
-          return null;
-        }
-        
-        data = result.data;
-        error = result.error;
-      } catch (timeoutErr) {
-        console.error('Subscription database check error:', timeoutErr);
-        return null;
-      }
-      
-      if (error) {
-        if (error.code === 'PGRST116') { // No subscription found
-          console.log(`No subscription found for user ${userId}`);
-          return null;
-        }
-        handleDatabaseError(error, 'getUserSubscription');
-        return null;
-      }
-      
-      console.log(`Found subscription for user ${userId}:`, data);
-      return {
-        id: data.id,
-        status: data.status,
-        current_period_end: data.current_period_end,
-        cancel_at_period_end: data.cancel_at_period_end
-      };
-    } catch (dbErr) {
-      console.error('Database error in getUserSubscription:', dbErr);
-      handleDatabaseError(dbErr, 'getUserSubscription');
-      return null;
-    }
-  } catch (err) {
-    console.error('Failed to get user subscription:', err);
+export async function getUserSubscription(
+  userId: string | undefined,
+  forceRefresh: boolean = false
+): Promise<Subscription | null> {
+  if (!userId) {
+    console.log('No userId provided for subscription check');
     return null;
   }
+
+  // If we have a cached subscription and we're not forcing a refresh, return it
+  if (cachedSubscription && !forceRefresh) {
+    return cachedSubscription;
+  }
+
+  try {
+    const apiKey = supabase.supabaseKey;
+    const baseUrl = supabase.supabaseUrl;
+    
+    // Create timeout with ability to cancel
+    let timeoutId: NodeJS.Timeout | null = null;
+    const timeoutPromise = new Promise<null>((resolve) => {
+      timeoutId = setTimeout(() => {
+        console.warn('Subscription check timed out, returning null');
+        resolve(null);
+      }, 5000);
+    });
+    
+    // Function to cancel the timeout
+    const cancelTimeout = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    // Try direct API request first to avoid 406 errors
+    try {
+      console.log(`Fetching subscription for user ${userId}`);
+      const endpoint = `${baseUrl}/rest/v1/user_subscriptions?user_id=eq.${userId}&select=*`;
+      
+      // Use a variable to track if we received a successful response
+      let receivedResponse = false;
+      
+      const fetchPromise = fetchWithRetry(
+        endpoint,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Prefer': 'return=representation'
+          },
+        },
+        2
+      );
+      
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (response === null) {
+        console.warn('Direct API subscription fetch timed out');
+      } else {
+        // We got a response, so cancel the timeout
+        receivedResponse = true;
+        cancelTimeout();
+        
+        if (response.ok) {
+          const subscriptions = await response.json();
+          console.log(`Received ${subscriptions.length} subscriptions via direct API`);
+          
+          if (subscriptions && subscriptions.length > 0) {
+            const subscription = subscriptions[0];
+            cachedSubscription = mapDatabaseSubscription(subscription);
+            return cachedSubscription;
+          }
+        } else {
+          console.warn(`Direct API subscription fetch failed with status ${response.status}`);
+        }
+      }
+    } catch (apiError) {
+      console.warn('Direct API subscription fetch failed, falling back to Supabase client', apiError);
+    }
+
+    // Cancel any remaining timeout before starting the next request
+    cancelTimeout();
+    
+    // Fallback to Supabase client
+    console.log('Using Supabase client as fallback for subscription check');
+    
+    // Create a new promise that will be resolved with the query result
+    const queryPromise = new Promise(async (resolve) => {
+      try {
+        const { data, error } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching user subscription:', error);
+          handleDatabaseError(error, 'getUserSubscription');
+          resolve(null);
+        } else if (!data) {
+          console.log('No subscription found for user');
+          resolve(null);
+        } else {
+          resolve(data);
+        }
+      } catch (err) {
+        console.error('Unexpected error in Supabase query:', err);
+        resolve(null);
+      }
+    });
+    
+    // Recreate timeout for Supabase client fallback
+    let fallbackTimeoutId: NodeJS.Timeout | null = null;
+    const fallbackTimeoutPromise = new Promise<null>((resolve) => {
+      fallbackTimeoutId = setTimeout(() => {
+        console.warn('Supabase fallback subscription check timed out');
+        resolve(null);
+      }, 5000);
+    });
+    
+    // Function to cancel the fallback timeout
+    const cancelFallbackTimeout = () => {
+      if (fallbackTimeoutId) {
+        clearTimeout(fallbackTimeoutId);
+        fallbackTimeoutId = null;
+      }
+    };
+    
+    // Use Promise.race to handle timeout for the fallback
+    const result = await Promise.race([queryPromise, fallbackTimeoutPromise]);
+    
+    // Always cancel the timeout to prevent it from resolving after we've already handled the result
+    cancelFallbackTimeout();
+
+    if (!result) {
+      console.warn('Subscription query returned null (timed out or no subscription)');
+      return null;
+    }
+    
+    cachedSubscription = mapDatabaseSubscription(result);
+    return cachedSubscription;
+  } catch (error) {
+    console.error('Unexpected error in getUserSubscription:', error);
+    return null;
+  }
+}
+
+/**
+ * Helper function to map database subscription to our Subscription type
+ */
+function mapDatabaseSubscription(data: any): Subscription {
+  return {
+    id: data.id,
+    userId: data.user_id,
+    status: data.status,
+    priceId: data.price_id,
+    productId: data.product_id,
+    interval: data.interval,
+    intervalCount: data.interval_count,
+    created: data.created_at ? new Date(data.created_at) : undefined,
+    periodEnd: new Date(data.current_period_end),
+    cancelAtPeriodEnd: data.cancel_at_period_end,
+    trialEnd: data.trial_end ? new Date(data.trial_end) : null,
+  };
+}
+
+/**
+ * Clear the cached subscription data
+ */
+export function clearCachedSubscription(): void {
+  cachedSubscription = null;
+  console.log('Subscription cache cleared');
 }
 
 /**
@@ -439,10 +517,45 @@ export async function getUserSubscription(userId?: string): Promise<Subscription
  */
 export async function hasActiveSubscription(userId?: string): Promise<boolean> {
   try {
+    // If no userId provided, get the current user
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
+      
+      if (!userId) {
+        console.warn('No userId provided for active subscription check');
+        return false;
+      }
+    }
+    
+    console.log(`Checking if user has active subscription for ${userId}`);
     const subscription = await getUserSubscription(userId);
-    return subscription !== null && subscription.status === 'active';
-  } catch (err) {
-    console.error('Failed to check active subscription:', err);
+    
+    if (!subscription) {
+      console.log(`No subscription found for user ${userId}, user is on free tier`);
+      return false;
+    }
+    
+    // Check if the subscription status is active or trialing
+    const activeStatuses = ['active', 'trialing'];
+    const isActive = activeStatuses.includes(subscription.status);
+    
+    console.log(`Subscription for user ${userId} has status: ${subscription.status}, isActive: ${isActive}`);
+    
+    // Check if the subscription is set to cancel at period end
+    if (subscription.cancelAtPeriodEnd) {
+      const periodEndDate = new Date(subscription.periodEnd);
+      const now = new Date();
+      const isStillActive = periodEndDate > now;
+      
+      console.log(`Subscription is set to cancel at period end (${periodEndDate.toISOString()}). Currently ${isStillActive ? 'still active' : 'inactive'}`);
+      
+      return isActive && isStillActive;
+    }
+    
+    return isActive;
+  } catch (error) {
+    console.error('Error checking subscription status:', error);
     return false;
   }
 }

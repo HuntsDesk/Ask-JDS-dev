@@ -174,10 +174,11 @@ export function SubscriptionSettings() {
 
   // Helper function to format subscription end date
   const formatSubscriptionEndDate = () => {
-    if (!subscription || !subscription.current_period_end) {
-      return 'Unknown';
+    if (!subscription || !subscription.periodEnd) {
+      return 'N/A';
     }
-    return formatDate(new Date(subscription.current_period_end));
+    
+    return formatDate(subscription.periodEnd);
   };
 
   // Render loading state
@@ -229,9 +230,9 @@ export function SubscriptionSettings() {
           <div>
             <h3 className="text-lg font-medium">Renewal</h3>
             <p className="text-sm text-muted-foreground">
-              Your subscription {subscription?.cancel_at_period_end ? 'will end' : 'renews'} on {formatSubscriptionEndDate()}
+              Your subscription {subscription?.cancelAtPeriodEnd ? 'will end' : 'renews'} on {formatSubscriptionEndDate()}
             </p>
-            {subscription?.cancel_at_period_end && (
+            {subscription?.cancelAtPeriodEnd && (
               <p className="text-sm text-amber-500 mt-1">
                 Your subscription is set to cancel at the end of the current period.
               </p>

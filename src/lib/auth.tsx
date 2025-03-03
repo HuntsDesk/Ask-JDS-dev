@@ -26,333 +26,277 @@ function setGlobalAuthInstance(instance: any) {
 // Create a singleton instance of the auth provider state
 let authInstance = getGlobalAuthInstance() || {
   user: null,
-  loading: false,
+  loading: true,
   authInitialized: false
 };
 
-function AuthProviderComponent({ children }: { children: React.ReactNode }) {
-  // Use the singleton instance if it exists
-  const [user, setUser] = useState<User | null>(authInstance.user || null);
-  const [loading, setLoading] = useState(authInstance.loading !== undefined ? authInstance.loading : false);
-  const [error, setError] = useState<Error | null>(null);
-  const [authInitialized, setAuthInitialized] = useState(authInstance.authInitialized || false);
-  const authStateChangeHandled = useRef(false);
-  const authSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
-  const initializingRef = useRef(false);
+// Static state to track initialization
+let isAuthInitializing = false;
+let authInitPromise: Promise<void> | null = null;
+let authInitialized = false;
 
-  useEffect(() => {
-    console.log('Auth provider initializing...', 
-      { 
-        existingUser: authInstance.user?.email, 
-        isInitialized: authInstance.authInitialized 
-      }
-    );
-    
-    let isMounted = true;
-    
-    // Safety timeout to prevent getting stuck in loading state
-    const safetyTimeoutId = setTimeout(() => {
-      if (isMounted) {
-        console.warn('Auth initialization safety timeout triggered after 16 seconds');
+// Initialize auth
+export async function initializeAuth() {
+  console.log('Auth initialization requested');
+  
+  // If already initialized, return immediately
+  if (authInitialized) {
+    console.log('Auth already initialized, returning');
+    return;
+  }
+
+  // If initialization is in progress, return the existing promise
+  if (isAuthInitializing && authInitPromise) {
+    console.log('Auth initialization already in progress, returning existing promise');
+    return authInitPromise;
+  }
+
+  isAuthInitializing = true;
+  
+  authInitPromise = new Promise<void>(async (resolve) => {
+    try {
+      console.log('Starting auth initialization');
+      
+      // Wait for Supabase client to be ready
+      await ensureSupabaseClientReady();
+      
+      console.log('Got Supabase client for auth initialization');
+      
+      // Set up the auth state change listener before fetching initial session
+      supabase.auth.onAuthStateChange((event, session) => {
+        console.log(`Auth state change: ${event}`);
+        const prevAuthStatus = authInstance.status;
         
-        // Force set initialized state regardless of loading state
-        setAuthInitialized(true);
-        
-        // Only set loading to false if it's still true
-        if (loading) {
-          setLoading(false);
-        }
-        
-        // Update singleton
-        authInstance.loading = false;
-        authInstance.authInitialized = true;
-        setGlobalAuthInstance(authInstance);
-        
-        // Force check session one more time
-        supabase.auth.getSession().then(({ data, error }) => {
-          if (error) {
-            console.error('Forced session check error:', error);
-            return;
-          }
+        if (event === 'SIGNED_IN') {
+          console.log('User signed in, updating auth instance');
+          const user = session?.user;
           
-          if (data?.session?.user) {
-            console.log('Forced session check found user:', data.session.user.email);
+          if (user) {
+            // Create user object with isAdmin always set to false
             const userData = {
-              id: data.session.user.id,
-              email: data.session.user.email!,
+              id: user.id,
+              email: user.email!,
               isAdmin: false, // Always false in user app
-              last_sign_in_at: data.session.user.last_sign_in_at,
-              user_metadata: data.session.user.user_metadata
+              last_sign_in_at: user.last_sign_in_at,
+              user_metadata: user.user_metadata
             };
             
-            if (isMounted) {
-              setUser(userData);
+            // Update singleton instance
+            authInstance.user = userData;
+            authInstance.status = 'authenticated';
+            authInstance.initialized = true;
+            authInstance.loading = false;
+            setGlobalAuthInstance(authInstance);
+            
+            // Refresh user data if needed
+            refreshUserData(userData);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          console.log('User signed out, clearing auth instance');
+          
+          // Update singleton instance
+          authInstance.user = null;
+          authInstance.status = 'unauthenticated';
+          authInstance.initialized = true;
+          authInstance.loading = false;
+          setGlobalAuthInstance(authInstance);
+        } else if (event === 'USER_UPDATED') {
+          console.log('User updated, refreshing user data');
+          const user = session?.user;
+          if (user) {
+            // Refresh user data
+            refreshUserData(user);
+          }
+        } else if (event === 'INITIAL_SESSION') {
+          // Only update if we don't already have a user (prevent overriding a SIGNED_IN event)
+          if (prevAuthStatus === 'loading') {
+            console.log('Initial session received', session?.user ? 'with user' : 'without user');
+            if (session?.user) {
+              // Create user object with isAdmin always set to false
+              const userData = {
+                id: session.user.id,
+                email: session.user.email!,
+                isAdmin: false, // Always false in user app
+                last_sign_in_at: session.user.last_sign_in_at,
+                user_metadata: session.user.user_metadata
+              };
               
-              // Update singleton
+              // Update singleton instance
               authInstance.user = userData;
+              authInstance.status = 'authenticated';
+              authInstance.initialized = true;
+              authInstance.loading = false;
+              setGlobalAuthInstance(authInstance);
+              
+              // Refresh user data
+              refreshUserData(userData);
+            } else {
+              // Update singleton instance
+              authInstance.user = null;
+              authInstance.status = 'unauthenticated';
+              authInstance.initialized = true;
+              authInstance.loading = false;
               setGlobalAuthInstance(authInstance);
             }
-          }
-        });
-      }
-    }, 16000); // 16 second timeout (longer than our getSession timeout + retries)
-    
-    const initializeAuth = async () => {
-      // Prevent multiple initializations
-      if (initializingRef.current) {
-        console.log('Auth initialization already in progress, skipping');
-        return;
-      }
-      
-      // If we already have a user in the singleton, use that
-      if (authInstance.authInitialized && authInstance.user) {
-        console.log('Using existing authenticated user from singleton:', authInstance.user.email);
-        setUser(authInstance.user);
-        setLoading(false);
-        setAuthInitialized(true);
-        return;
-      }
-      
-      initializingRef.current = true;
-      setLoading(true);
-      
-      try {
-        console.log('Starting auth initialization...');
-        
-        // Check network status first
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          console.warn('Network appears to be offline. This may cause auth initialization to fail.');
-        }
-        
-        // Log browser and environment information for debugging
-        console.log('Browser info:', {
-          userAgent: navigator.userAgent,
-          platform: navigator.platform,
-          vendor: navigator.vendor
-        });
-        
-        console.log('Getting auth session...');
-        
-        // Increase timeout to 15 seconds and add retry logic
-        const maxRetries = 2;
-        let retryCount = 0;
-        let sessionResult = null;
-        
-        while (retryCount <= maxRetries && !sessionResult) {
-          try {
-            if (retryCount > 0) {
-              console.log(`Retrying auth session fetch (attempt ${retryCount} of ${maxRetries})...`);
-            }
-            
-            // Use a direct approach first without timeout to see if that works
-            if (retryCount === maxRetries) {
-              console.log('Final attempt: trying direct Supabase call without timeout wrapper');
-              sessionResult = await supabase.auth.getSession();
-            } else {
-              // Use withTimeout with a longer timeout (15 seconds)
-              sessionResult = await withTimeout(
-                supabase.auth.getSession(),
-                15000, // 15 second timeout
-                `Auth session fetch timed out (attempt ${retryCount + 1})`
-              );
-            }
-            
-            console.log('Auth session fetch completed successfully');
-          } catch (timeoutError) {
-            console.warn(`Auth session fetch attempt ${retryCount + 1} timed out:`, timeoutError);
-            
-            // Log additional diagnostic information
-            console.log('Diagnostic info for timeout:', {
-              retryCount,
-              timestamp: new Date().toISOString(),
-              online: typeof navigator !== 'undefined' ? navigator.onLine : 'unknown'
-            });
-            
-            retryCount++;
-            
-            // If we've exhausted all retries, we'll continue and set authInitialized to true
-            // This allows the app to function even if auth is having issues
-            if (retryCount > maxRetries) {
-              console.error('All auth session fetch attempts failed. Continuing without session.');
-              // Don't throw, just continue with null session
-              sessionResult = { data: { session: null }, error: timeoutError };
-            }
-            
-            // Short delay before retry
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        }
-        
-        if (!sessionResult) {
-          throw new Error('Failed to fetch auth session after multiple attempts');
-        }
-        
-        const { data: { session }, error: sessionError } = sessionResult;
-          
-        if (sessionError) {
-          console.error('Auth session error:', sessionError);
-          if (isMounted) {
-            setError(sessionError);
-            setLoading(false);
-            setAuthInitialized(true);
-            
-            // Update singleton
-            authInstance.loading = false;
-            authInstance.authInitialized = true;
-            setGlobalAuthInstance(authInstance);
-          }
-          initializingRef.current = false;
-          return;
-        }
-
-        if (session?.user) {
-          console.log('User found in session:', session.user.email);
-          
-          // Create user object with isAdmin always set to false
-          const userData = {
-            id: session.user.id,
-            email: session.user.email!,
-            isAdmin: false, // Always false in user app
-            last_sign_in_at: session.user.last_sign_in_at,
-            user_metadata: session.user.user_metadata
-          };
-          
-          if (isMounted) {
-            setUser(userData);
-            setLoading(false);
-            setAuthInitialized(true);
-            authStateChangeHandled.current = true;
-            
-            // Update singleton
-            authInstance.user = userData;
-            authInstance.loading = false;
-            authInstance.authInitialized = true;
-            setGlobalAuthInstance(authInstance);
-            
-            console.log('Auth initialization complete with user:', userData.email);
-          }
-        } else {
-          console.log('No user found in session');
-          if (isMounted) {
-            setUser(null);
-            setLoading(false);
-            setAuthInitialized(true);
-            
-            // Update singleton
-            authInstance.user = null;
-            authInstance.loading = false;
-            authInstance.authInitialized = true;
-            setGlobalAuthInstance(authInstance);
-            
-            console.log('Auth initialization complete with no user');
-          }
-        }
-        
-        initializingRef.current = false;
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-        if (isMounted) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-          setAuthInitialized(true);
-          
-          // Update singleton
-          authInstance.loading = false;
-          authInstance.authInitialized = true;
-          setGlobalAuthInstance(authInstance);
-        }
-        
-        initializingRef.current = false;
-      } finally {
-        // Ensure authInitialized is set to true even if there's an error
-        if (isMounted && !authInitialized) {
-          console.log('Setting authInitialized to true in finally block');
-          setAuthInitialized(true);
-          
-          // Update singleton
-          authInstance.authInitialized = true;
-          setGlobalAuthInstance(authInstance);
-        }
-      }
-    };
-
-    // Only set up auth state change subscription if it doesn't exist yet
-    if (!authSubscriptionRef.current) {
-      console.log('Setting up auth state change listener...');
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log('Auth state changed:', event);
-        
-        if (session?.user) {
-          console.log('User in auth state change:', session.user.email);
-          
-          // Create user object with isAdmin always set to false
-          const userData = {
-            id: session.user.id,
-            email: session.user.email!,
-            isAdmin: false, // Always false in user app
-            last_sign_in_at: session.user.last_sign_in_at,
-            user_metadata: session.user.user_metadata
-          };
-          
-          if (isMounted) {
-            setUser(userData);
-            setLoading(false);
-            setAuthInitialized(true);
-            authStateChangeHandled.current = true;
-            
-            // Update singleton
-            authInstance.user = userData;
-            authInstance.loading = false;
-            authInstance.authInitialized = true;
-            setGlobalAuthInstance(authInstance);
-            
-            console.log('Auth state change complete with user:', userData.email);
-          }
-        } else {
-          console.log('No user in auth state change');
-          if (isMounted) {
-            setUser(null);
-            setLoading(false);
-            setAuthInitialized(true);
-            
-            // Update singleton
-            authInstance.user = null;
-            authInstance.loading = false;
-            authInstance.authInitialized = true;
-            setGlobalAuthInstance(authInstance);
-            
-            console.log('Auth state change complete with no user');
+          } else {
+            console.log(`Ignoring INITIAL_SESSION event because auth status is already ${prevAuthStatus}`);
           }
         }
       });
       
-      authSubscriptionRef.current = subscription;
-      console.log('Auth state change listener set up');
-    }
-
-    // Initialize auth only if not already initialized
-    if (!authInstance.authInitialized) {
-      initializeAuth();
-    } else {
-      console.log('Auth already initialized, using cached state');
-      setLoading(false);
-    }
-
-    return () => {
-      console.log('Auth provider cleanup');
-      isMounted = false;
-      clearTimeout(safetyTimeoutId);
+      try {
+        // Use our improved withTimeout utility to fetch the session
+        const { data: { session } } = await withTimeout(
+          () => supabase.auth.getSession(),
+          15000,
+          'Auth session fetch timed out',
+          2
+        );
+        
+        console.log('Initial session fetch successful', session ? 'with session' : 'without session');
+        
+        if (session?.user) {
+          console.log('User found in session, updating auth instance');
+          
+          // Create user object with isAdmin always set to false
+          const userData = {
+            id: session.user.id,
+            email: session.user.email!,
+            isAdmin: false, // Always false in user app
+            last_sign_in_at: session.user.last_sign_in_at,
+            user_metadata: session.user.user_metadata
+          };
+          
+          // Update singleton instance
+          authInstance.user = userData;
+          authInstance.status = 'authenticated';
+          authInstance.initialized = true;
+          authInstance.loading = false;
+          setGlobalAuthInstance(authInstance);
+          
+          // Refresh user data
+          refreshUserData(userData);
+        } else {
+          console.log('No user in session, setting unauthenticated');
+          
+          // Update singleton instance
+          authInstance.user = null;
+          authInstance.status = 'unauthenticated';
+          authInstance.initialized = true;
+          authInstance.loading = false;
+          setGlobalAuthInstance(authInstance);
+        }
+      } catch (error) {
+        console.error('Error fetching initial session:', error);
+        
+        // Update singleton instance
+        authInstance.user = null;
+        authInstance.status = 'unauthenticated';
+        authInstance.initialized = true;
+        authInstance.loading = false;
+        setGlobalAuthInstance(authInstance);
+      }
       
-      // Don't unsubscribe from auth state changes to maintain the subscription across component remounts
-      // if (authSubscriptionRef.current) {
-      //   authSubscriptionRef.current.unsubscribe();
-      //   authSubscriptionRef.current = null;
-      // }
+      authInitialized = true;
+      resolve();
+    } catch (error) {
+      console.error('Error during auth initialization:', error);
+      // Even on error, mark as initialized so the app can proceed
+      
+      // Update singleton instance
+      authInstance.user = null;
+      authInstance.status = 'unauthenticated';
+      authInstance.initialized = true;
+      authInstance.loading = false;
+      setGlobalAuthInstance(authInstance);
+      
+      authInitialized = true;
+      resolve();
+    } finally {
+      isAuthInitializing = false;
+    }
+  });
+  
+  return authInitPromise;
+}
+
+/**
+ * Ensure Supabase client is ready before proceeding with auth
+ */
+async function ensureSupabaseClientReady(): Promise<void> {
+  try {
+    await withTimeout(
+      () => Promise.resolve(supabase),
+      5000,
+      'Supabase client initialization timeout'
+    );
+    console.log('Supabase client ready for auth');
+  } catch (error) {
+    console.error('Error ensuring Supabase client is ready:', error);
+  }
+}
+
+/**
+ * Function to refresh user metadata or perform other data fetching after auth
+ */
+async function refreshUserData(user: User): Promise<void> {
+  console.log('Refreshing user data for:', user.email);
+  // Add additional data fetching here if needed
+}
+
+function AuthProviderComponent({ children }: { children: React.ReactNode }) {
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [user, setUser] = useState<User | null>(authInstance.user);
+  const [loading, setLoading] = useState(authInstance.loading);
+  const [authInitialized, setAuthInitialized] = useState(authInstance.authInitialized);
+  
+  // Trigger auth initialization when the component mounts
+  useEffect(() => {
+    console.log('AuthProvider mounted, initializing auth');
+    
+    // Start initialization after a small delay to ensure Supabase client has time to initialize
+    setTimeout(() => {
+      const initialize = async () => {
+        try {
+          await initializeAuth();
+          setIsInitialized(true);
+          
+          // Update component state from singleton
+          setUser(authInstance.user);
+          setLoading(false);
+          setAuthInitialized(true);
+        } catch (error) {
+          console.error('Error during auth initialization:', error);
+          setIsInitialized(true);
+          setLoading(false);
+          setAuthInitialized(true);
+        }
+      };
+      
+      void initialize();
+    }, 100);
+    
+    // Subscribe to auth changes
+    const authCheckInterval = setInterval(() => {
+      if (authInstance.user !== user) {
+        setUser(authInstance.user);
+      }
+      if (authInstance.loading !== loading) {
+        setLoading(authInstance.loading);
+      }
+      if (authInstance.authInitialized !== authInitialized) {
+        setAuthInitialized(authInstance.authInitialized);
+      }
+    }, 100);
+    
+    return () => {
+      console.log('AuthProvider unmounted');
+      clearInterval(authCheckInterval);
     };
   }, []);
-
+  
   // Create the auth context value
-  const value: AuthContextType = {
+  const authContextValue: AuthContextType = {
     user,
     loading,
     authInitialized,
@@ -360,7 +304,6 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
       try {
         console.log('Auth provider: signIn called for', email);
         setLoading(true);
-        authStateChangeHandled.current = false;
         
         // Update singleton
         authInstance.loading = true;
@@ -408,6 +351,10 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
           console.log('User state updated immediately after sign in:', userData);
         } else {
           setLoading(false);
+          
+          // Update singleton
+          authInstance.loading = false;
+          setGlobalAuthInstance(authInstance);
         }
         
         return { error: null };
@@ -494,7 +441,6 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
         setGlobalAuthInstance(authInstance);
         
         // Use window.location.href for a full page reload to clear any stale state
-        // Redirect to homepage instead of sign-in page
         window.location.href = '/';
         
         return { error: null };
@@ -510,10 +456,19 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
       }
     }
   };
-
-  // Always render children, don't block with a loading spinner
+  
+  if (!isInitialized && loading) {
+    // Still initializing, show a loading state
+    return (
+      <div className="flex justify-center items-center h-screen w-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+  
+  // Auth is initialized or timed out, render children with the context
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );

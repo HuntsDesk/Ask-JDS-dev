@@ -17,7 +17,8 @@ import {
   HelpCircle,
   Coffee,
   User,
-  Settings
+  Settings,
+  CheckCircle
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -154,26 +155,16 @@ export function HomePage() {
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10">
-              {/* Small icons - lower z-index */}
-              <div className="absolute -top-2 -right-2 animate-float-delayed z-0">
-                <Scale className="w-4 h-4 text-yellow-500 opacity-60" />
-              </div>
-              <div className="absolute -bottom-1 -left-2 animate-float z-0">
-                <BookOpenCheck className="w-4 h-4 text-purple-500 opacity-70" />
-              </div>
-              <div className="absolute -bottom-2 -right-1 z-0">
-                <Sparkles className="w-3 h-3 text-sky-400 animate-pulse" />
-              </div>
-              {/* Main brain icon - brand orange */}
-              <div className="absolute top-0 left-0 animate-float-slow z-10">
-                <Brain className="w-10 h-10 text-[#F37022]" />
-              </div>
-            </div>
-            <span className="text-2xl font-bold text-black">Ask JDS</span>
+            <Link to="/" className="flex items-center gap-3">
+              <img 
+                src="/images/JDSimplified_Logo.png" 
+                alt="JD Simplified Logo" 
+                className="h-12" 
+              />
+            </Link>
           </div>
 
-          {/* Navigation Links */}
+          {/* Navigation Links | Header | Top Menu */}
           <div className="flex items-center">
             {user ? (
               <>
@@ -208,20 +199,28 @@ export function HomePage() {
                 </DropdownMenu>
               </>
             ) : (
-              <Button 
-                onClick={() => navigate('/auth')}
-                className="text-gray-600 hover:text-[#F37022] font-semibold transition-colors"
-                variant="ghost"
-              >
-                Login
-              </Button>
+              <div className="flex items-center gap-4">
+                <Button 
+                  onClick={() => navigate('/auth')}
+                  className="text-gray-600 hover:text-[#F37022] transition-colors"
+                  variant="ghost"
+                >
+                  Login
+                </Button>
+                <Button 
+                  onClick={() => navigate('/auth?tab=signup')}
+                  className="bg-[#F37022] hover:bg-[#E35D10] text-white"
+                >
+                  Sign Up
+                </Button>
+              </div>
             )}
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 bg-gradient-to-b from-gray-50 to-white">
+      <section className="pt-32 pb-20 bg-gradient-to-b from-gray-50 to-white animated-gradient">
         <div className="max-w-4xl mx-auto px-4">
           {/* Hero Logo Section - Larger, vertically stacked */}
           <div className="flex flex-col items-center justify-center mb-8">
@@ -280,7 +279,7 @@ export function HomePage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-20 bg-[#00178E]/30">
+      <section className="py-20 bg-gradient-to-b from-[#00178E]/5 to-[#00178E]/5">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-4xl font-bold text-center mb-16 text-black">How It Works</h2>
           <div className="grid md:grid-cols-3 gap-8">
@@ -342,7 +341,7 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Example Questions */}
+      {/* FAQ */}
       <section className="py-20 bg-[#00178E]/5">
         <div className="max-w-6xl mx-auto px-4">
           <div className="text-center mb-16">
@@ -376,45 +375,137 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 bg-[#00178E] relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#00178E] to-[#001070] opacity-90"></div>
-        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <h2 className="text-5xl font-bold text-white mb-6">
-            {user ? (hasSubscription ? "You're All Set!" : "Upgrade Your Experience") : "Sign Up Now"}
-          </h2>
-          <p className="text-2xl text-white mb-10">
-            {hasSubscription 
-              ? "You're all set with your premium subscription! Head to the chat to start asking questions."
-              : "Skip the overpriced tutors and questionable Reddit advice—AsPH levels 98% effective tutorial on how to make it Lemon balm and I will send it cucumber JDS is your $5/month legal survival guide."}
+      {/* Pricing Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-4xl font-bold text-black">Simple, Transparent Pricing</h2>
+          <p className="text-lg text-gray-600 mt-2">
+            Ask JDS. Smarter than your group chat, cheaper than a tutor.
           </p>
-          <div className="flex flex-col md:flex-row gap-4 mt-8 justify-center">
-            {user ? (
-              <button 
-                onClick={() => navigate('/chat')}
-                className="bg-[#F37022] hover:bg-[#E35D10] text-white font-medium py-4 px-8 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-xl"
-              >
-                <MessageSquare className="w-6 h-6" />
-                Start Chatting
-              </button>
-            ) : (
-              <Link 
-                to="/auth"
-                className="bg-[#F37022] hover:bg-[#E35D10] text-white font-medium py-4 px-8 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-xl"
-              >
-                <Rocket className="w-6 h-6" />
-                Sign Up
-              </Link>
-            )}
-          </div>
+        </div>
+        <div className="mt-12 flex flex-col md:flex-row justify-center gap-8 max-w-5xl mx-auto">
+          {[
+            {
+              title: "Basic",
+              price: "$0",
+              tagline: "FREE FOREVER",
+              features: [
+                "5 Messages Per Day",
+                "Basic Legal Concepts",
+                "Standard Response Time",
+              ],
+              buttonText: "Try For Free",
+              buttonVariant: "outline",
+              highlight: false,
+            },
+            {
+              title: "Premium",
+              price: "$5",
+              tagline: "MOST POPULAR",
+              features: [
+                "Unlimited Messages",
+                "Advanced Legal Concepts",
+                "Priority Response Time",
+                "Exam Prep & Case Analysis",
+              ],
+              buttonText: "Get Premium Access",
+              buttonVariant: "primary",
+              highlight: true,
+            },
+          ].map((plan, index) => (
+            <div
+              key={index}
+              className={`relative flex flex-col p-6 rounded-lg shadow-lg w-full md:w-1/2 transition-transform hover:scale-105
+                ${plan.highlight ? "bg-orange-100 border-2 border-orange-500" : "bg-white"}
+              `}
+            >
+              {plan.highlight && (
+                <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  {plan.tagline}
+                </div>
+              )}
+              <h3 className="text-2xl font-semibold text-gray-900">{plan.title}</h3>
+              <p className="text-5xl font-bold text-black mt-2">{plan.price}
+                <span className="text-lg font-medium text-gray-600">/month</span>
+              </p>
+              <ul className="mt-4 space-y-3">
+                {plan.features.map((feature, i) => (
+                  <li key={i} className="flex items-center gap-2 text-gray-700">
+                    <CheckCircle className="text-green-500 w-5 h-5" /> {feature}
+                  </li>
+                ))}
+              </ul>
+              {user ? (
+                plan.title === "Basic" ? (
+                  <Button
+                    onClick={() => navigate('/chat')}
+                    className={`mt-6 w-full ${plan.highlight ? "bg-orange-500 hover:bg-orange-600 text-white" : "border-gray-400 hover:bg-gray-100"}`}
+                  >
+                    Start Chatting
+                  </Button>
+                ) : (
+                  hasSubscription ? (
+                    <Button
+                      onClick={() => navigate('/chat')}
+                      className="mt-6 w-full bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      Start Chatting
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => navigate('/settings')}
+                      className="mt-6 w-full bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      Upgrade Now
+                    </Button>
+                  )
+                )
+              ) : (
+                <Button
+                  onClick={() => navigate('/auth?tab=signup')}
+                  className={`mt-6 w-full ${plan.highlight ? "bg-orange-500 hover:bg-orange-600 text-white" : "border-gray-400 hover:bg-gray-100"}`}
+                >
+                  {plan.buttonText}
+                </Button>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Tagline Section */}
-      <section className="py-8 text-center">
-        <p className="text-lg font-semibold text-[#00178E]">
-          Ask JDS. Smarter than your group chat, cheaper than a tutor.
-        </p>
+      {/* CTA */}
+      <section className="py-20 bg-[#00178E]/5 relative overflow-hidden">
+        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
+          <h2 className="text-5xl font-bold text-[#00178E] mb-6">
+            {user ? (hasSubscription ? "You're All Set!" : "Upgrade Your Experience") : "Sign Up Now"}
+          </h2>
+          <p className="text-2xl text-[#00178E] mb-10">
+            {hasSubscription 
+              ? "You're all set with your premium subscription! Head to the chat to start asking questions."
+              : "Skip the overpriced tutors and questionable Reddit advice—Ask JDS is your $5/month legal survival guide."}
+          </p>
+          <div className="flex flex-col items-center gap-8">
+            <div className="flex flex-col md:flex-row gap-4 justify-center">
+              {user ? (
+                <button 
+                  onClick={() => navigate('/chat')}
+                  className="bg-[#F37022] hover:bg-[#E35D10] text-white font-medium py-4 px-8 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-xl"
+                >
+                  <MessageSquare className="w-6 h-6" />
+                  Start Chatting
+                </button>
+              ) : (
+                <Link 
+                  to="/auth"
+                  className="bg-[#F37022] hover:bg-[#E35D10] text-white font-medium py-4 px-8 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-xl"
+                >
+                  <Rocket className="w-6 h-6" />
+                  Sign Up
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Footer */}
@@ -424,10 +515,11 @@ export function HomePage() {
             {/* Logo and Description */}
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
-                <div className="relative w-10 h-10">
-                  <Brain className="w-10 h-10 text-[#F37022]" />
-                </div>
-                <span className="text-2xl font-bold text-white">Ask JDS</span>
+                <img 
+                  src="/images/JDSimplified_Logo_wht.png" 
+                  alt="JD Simplified Logo" 
+                  className="h-12" 
+                />
               </div>
               <p className="text-gray-300 mb-4">
                 Your AI-powered law school study companion that helps you understand complex legal concepts, prepare for exams, and boost your confidence.
@@ -504,7 +596,7 @@ export function HomePage() {
           
           <div className="border-t border-blue-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-300 text-sm mb-4 md:mb-0">
-              &copy; {new Date().getFullYear()} JD Simplified. All rights reserved.
+              &copy; {new Date().getFullYear()} JD Simplified, LLC. All rights reserved.
             </p>
             <p className="text-gray-300 text-sm">
               Made with ❤️ for law students everywhere

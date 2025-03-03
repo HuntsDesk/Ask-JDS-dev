@@ -126,12 +126,17 @@ Respond with ONLY the title, no quotes or additional text.`;
 
     while (retryCount <= MAX_RETRIES && !success) {
       try {
+        let timeoutId: NodeJS.Timeout | null = null;
+        let hasReceivedResponse = false;
+        
         // Create a timeout promise that resolves to empty messages
         const timeoutPromise = new Promise<{data: Message[], error: null}>((resolve) => {
-          setTimeout(() => {
-            console.warn(`useMessages: Loading messages timed out after 10 seconds (attempt ${retryCount + 1}/${MAX_RETRIES + 1}), returning empty messages`);
-            resolve({data: [], error: null});
-          }, 10000); // 10 second timeout (increased from 6 seconds)
+          timeoutId = setTimeout(() => {
+            if (!hasReceivedResponse) {
+              console.warn(`useMessages: Loading messages timed out after 10 seconds (attempt ${retryCount + 1}/${MAX_RETRIES + 1}), returning empty messages`);
+              resolve({data: [], error: null});
+            }
+          }, 10000); // 10 second timeout
         });
         
         // Load messages
@@ -143,85 +148,69 @@ Respond with ONLY the title, no quotes or additional text.`;
         
         // Race the fetch against the timeout
         const result = await Promise.race([fetchPromise, timeoutPromise]);
+        hasReceivedResponse = true;
+        if (timeoutId) clearTimeout(timeoutId);
         
         const { data, error } = result;
 
         if (error) {
           console.error('Error loading messages:', error);
-          console.error('Error details:', JSON.stringify(error));
-          await logError(error, 'Load Messages');
-          
-          if (retryCount === MAX_RETRIES) {
-            showDelayedToast({
-              title: 'Error',
-              description: 'Failed to load messages. Please try again.',
-              variant: 'destructive',
-            });
-            setMessages([]);
-          }
-          retryCount++;
-          continue;
-        }
-        
-        const messagesList = data || [];
-        const wasTimeout = !data || messagesList.length === 0;
-        
-        if (wasTimeout) {
-          if (retryCount < MAX_RETRIES) {
-            console.log(`useMessages: Attempt ${retryCount + 1}/${MAX_RETRIES + 1} timed out, retrying...`);
-            retryCount++;
-            continue;
-          }
-          
-          showDelayedToast({
-            title: 'Slow database response',
-            description: 'Your messages may take longer to load. Please wait or try refreshing.',
-            variant: 'warning',
-          });
-        }
-        
-        // Add all loaded message IDs to our tracking set
-        messagesList.forEach(msg => {
-          addedMessageIds.current.add(msg.id);
-          // Count existing user messages
-          if (msg.role === 'user') {
-            userMessageCountRef.current++;
-          }
-        });
-        
-        setMessages(messagesList);
-
-        // Handle first message callback if needed
-        if (messagesList.length > 0 && onFirstMessage && isFirstMessageRef.current) {
-          const firstUserMessage = messagesList.find(m => m.role === 'user');
-          if (firstUserMessage) {
-            onFirstMessage(firstUserMessage.content);
-            isFirstMessageRef.current = false;
-          }
+          throw error;
         }
 
-        success = true;
-      } catch (error) {
-        console.error(`useMessages: Error loading messages (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error);
-        await logError(error, 'Load Messages');
-        
-        if (retryCount === MAX_RETRIES) {
-          showDelayedToast({
-            title: 'Error',
-            description: 'Failed to load messages. Please try again.',
-            variant: 'destructive',
-          });
-          // Ensure messages are set to empty array on error
+        if (data && data.length > 0) {
+          // Sort messages by created_at just to be safe
+          const sortedMessages = [...data].sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          
+          // Count user messages for tracking limits
+          const userMessageCount = sortedMessages.filter(m => m.role === 'user').length;
+          userMessageCountRef.current = userMessageCount;
+          
+          console.log(`Loaded ${sortedMessages.length} messages (${userMessageCount} from user) for thread ${threadId}`);
+          
+          setMessages(sortedMessages);
+          success = true;
+          
+          // If this is the first load and the thread has a user message, call onFirstMessage
+          if (isFirstMessageRef.current && sortedMessages.some(m => m.role === 'user') && onFirstMessage) {
+            const firstUserMessage = sortedMessages.find(m => m.role === 'user');
+            if (firstUserMessage) {
+              onFirstMessage(firstUserMessage.content);
+              isFirstMessageRef.current = false;
+            }
+          }
+
+          break; // Exit the retry loop if successful
+        } else {
+          console.log(`No messages found for thread ${threadId} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
           setMessages([]);
+          success = true; // Consider empty results a success
+          break; // Exit the retry loop since we have a valid (empty) result
         }
+      } catch (error) {
+        console.error(`Error loading messages (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error);
+        
+        // If this is the last attempt, set an empty array and show an error
+        if (retryCount === MAX_RETRIES) {
+          setMessages([]);
+          showDelayedToast({
+            title: "Error loading messages",
+            description: "We encountered an error loading messages. Please try refreshing.",
+            variant: "destructive",
+          });
+        } else {
+          // Otherwise, retry after a short delay
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          console.log(`Retrying message load (attempt ${retryCount + 2}/${MAX_RETRIES + 1})...`);
+        }
+      } finally {
         retryCount++;
       }
     }
-    
+
     setLoading(false);
-    
-    // After the first load, set initialLoadRef to false
-    initialLoadRef.current = false;
   }, [threadId, onFirstMessage, showDelayedToast]);
 
   // Load messages when thread changes

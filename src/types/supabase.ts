@@ -195,6 +195,87 @@ export interface Database {
           updated_at?: string
         }
       }
+      subjects: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          is_official: boolean
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description: string
+          is_official?: boolean
+          created_at?: string
+          user_id?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          is_official?: boolean
+          created_at?: string
+          user_id?: string
+        }
+      }
+      flashcard_collections: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          subject_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description: string
+          subject_id: string
+          created_at?: string
+          user_id?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string
+          subject_id?: string
+          created_at?: string
+          user_id?: string
+        }
+      }
+      flashcards: {
+        Row: {
+          id: string
+          question: string
+          answer: string
+          is_mastered: boolean
+          collection_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          question: string
+          answer: string
+          is_mastered?: boolean
+          collection_id: string
+          created_at?: string
+          user_id?: string
+        }
+        Update: {
+          id?: string
+          question?: string
+          answer?: string
+          is_mastered?: boolean
+          collection_id?: string
+          created_at?: string
+          user_id?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

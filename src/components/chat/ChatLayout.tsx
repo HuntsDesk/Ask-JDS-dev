@@ -25,6 +25,20 @@ export function ChatLayout() {
     deleteThread
   } = useThreads();
 
+  // Check if user has active subscription
+  useEffect(() => {
+    if (user) {
+      const checkSubscription = async () => {
+        const result = await import('@/lib/subscription').then(
+          module => module.hasActiveSubscription(user.id)
+        );
+        console.log(`User subscription active: ${result}`);
+      };
+      
+      checkSubscription();
+    }
+  }, [user]);
+
   // Add a safety timeout to prevent getting stuck in loading state
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null;

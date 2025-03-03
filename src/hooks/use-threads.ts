@@ -64,6 +64,9 @@ export function useThreads() {
         console.log('useThreads: Fetching threads for user', user.email);
         setLoading(true);
         
+        let fetchTimeoutId: NodeJS.Timeout | null = null;
+        let hasReceivedResponse = false;
+        
         // Add a timeout promise to prevent hanging
         const fetchPromise = supabase
           .from('threads')
@@ -73,14 +76,18 @@ export function useThreads() {
           
         // Create a timeout promise that resolves with empty data
         const timeoutPromise = new Promise<{data: Thread[], error: null}>((resolve) => {
-          setTimeout(() => {
-            console.warn('useThreads: Database fetch timed out after 10 seconds, returning empty threads');
-            resolve({data: [], error: null});
-          }, 10000); // Increased from 6000 to 10000ms (10 seconds)
+          fetchTimeoutId = setTimeout(() => {
+            if (!hasReceivedResponse) {
+              console.warn('useThreads: Database fetch timed out after 10 seconds, returning empty threads');
+              resolve({data: [], error: null});
+            }
+          }, 10000); // 10 seconds timeout
         });
         
         // Race the fetch against the timeout
         const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+        hasReceivedResponse = true;
+        if (fetchTimeoutId) clearTimeout(fetchTimeoutId);
 
         if (error) {
           console.error('useThreads: Error fetching threads:', error);
@@ -99,90 +106,65 @@ export function useThreads() {
               // Set a new timeout to show the toast after 2 seconds
               toastTimeoutRef.current = setTimeout(() => {
                 toast({
-                  title: "Error loading threads",
-                  description: "There was a problem loading your conversations. Please try refreshing.",
+                  title: "Error loading conversations",
+                  description: "We encountered an error loading your conversations. Please try again.",
                   variant: "destructive",
                 });
                 toastTimeoutRef.current = null;
               }, 2000);
             } else {
               toast({
-                title: "Error loading threads",
-                description: "There was a problem loading your conversations. Please try refreshing.",
+                title: "Error loading conversations",
+                description: "We encountered an error loading your conversations. Please try again.",
                 variant: "destructive",
               });
             }
-            
-            setThreads([]);
-            setLoading(false);
           }
+          
+          setLoading(false);
           return;
         }
-        
-        // Check if we got actual data or an empty array from the timeout
-        const wasTimeout = !data || data.length === 0;
-        console.log(`useThreads: Fetched ${data?.length || 0} threads${wasTimeout ? ' (timeout)' : ''}`);
-        
+
         if (isMounted) {
-          setThreads(data || []);
-          setError(null);
-          setLoading(false);
+          console.log('useThreads: Fetched', data?.length ?? 0, 'threads');
           
-          // If this was a timeout but we're showing empty threads, let the user know
-          if (wasTimeout) {
-            // Only show toast after a delay on initial load
-            if (initialLoadRef.current) {
-              // Clear any existing timeout
-              if (toastTimeoutRef.current) {
-                clearTimeout(toastTimeoutRef.current);
-              }
-              
-              // Set a new timeout to show the toast after 2 seconds
-              toastTimeoutRef.current = setTimeout(() => {
-                toast({
-                  title: "Slow database response",
-                  description: "Your conversations may take longer to load. Please wait or try refreshing.",
-                  variant: "warning",
-                });
-                toastTimeoutRef.current = null;
-              }, 2000);
-            } else {
-              toast({
-                title: "Slow database response",
-                description: "Your conversations may take longer to load. Please wait or try refreshing.",
-                variant: "warning",
-              });
+          if (data && Array.isArray(data)) {
+            setThreads(data);
+            // Once we get data, clear any safety timeout we've previously set
+            if (safetyTimeoutId) {
+              clearTimeout(safetyTimeoutId);
             }
+          } else {
+            console.warn('useThreads: Received non-array data from thread fetch:', data);
+            setThreads([]);
           }
-        }
-      } catch (error) {
-        console.error('useThreads: Exception fetching threads:', error);
-        if (isMounted) {
-          setError(error instanceof Error ? error : new Error(String(error)));
-          setLoading(false);
-          setThreads([]);
           
-          // Show an error toast
-          // Only show toast after a delay on initial load
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('useThreads: Error in fetchThreads:', err);
+        if (isMounted) {
+          setError(err instanceof Error ? err : new Error(String(err)));
+          setLoading(false);
+          
+          // Show an error toast (with delay on initial load)
           if (initialLoadRef.current) {
-            // Clear any existing timeout
             if (toastTimeoutRef.current) {
               clearTimeout(toastTimeoutRef.current);
             }
             
-            // Set a new timeout to show the toast after 2 seconds
             toastTimeoutRef.current = setTimeout(() => {
               toast({
-                title: "Error loading threads",
-                description: "There was a problem loading your conversations. Please try refreshing.",
+                title: "Error loading conversations",
+                description: "We encountered an error loading your conversations. Please try again.",
                 variant: "destructive",
               });
               toastTimeoutRef.current = null;
             }, 2000);
           } else {
             toast({
-              title: "Error loading threads",
-              description: "There was a problem loading your conversations. Please try refreshing.",
+              title: "Error loading conversations",
+              description: "We encountered an error loading your conversations. Please try again.",
               variant: "destructive",
             });
           }

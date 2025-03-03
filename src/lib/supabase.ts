@@ -12,6 +12,10 @@ declare global {
   }
 }
 
+// Track initialization state
+let isInitializing = false;
+let clientInitialized = false;
+
 // Check if we already have a client in the global scope
 if (typeof window !== 'undefined') {
   console.log('Checking for existing Supabase client in global scope');
@@ -19,6 +23,7 @@ if (typeof window !== 'undefined') {
     console.log('No existing Supabase client found in global scope');
   } else {
     console.log('Found existing Supabase client in global scope');
+    clientInitialized = true;
   }
 }
 
@@ -40,6 +45,27 @@ function getSupabaseClient() {
     console.log('Using existing Supabase client from global scope');
     return window[GLOBAL_SUPABASE_KEY];
   }
+
+  // Prevent concurrent initialization
+  if (isInitializing) {
+    console.warn('Supabase client initialization already in progress, creating temporary client');
+    // Return a temporary instance that will be replaced once initialization completes
+    return createClient<Database>(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: true,
+          storageKey: 'ask-jds-auth-storage',
+          storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+          autoRefreshToken: true,
+          detectSessionInUrl: false
+        }
+      }
+    );
+  }
+
+  isInitializing = true;
 
   // Create a new client
   console.log('Creating new Supabase client instance');
@@ -71,6 +97,8 @@ function getSupabaseClient() {
     window.supabaseClient = instance;
   }
 
+  clientInitialized = true;
+  isInitializing = false;
   return instance;
 }
 
@@ -110,15 +138,6 @@ function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Resp
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.warn(`[${requestId}] Network appears to be offline. This may be causing the timeout.`);
     }
-    
-    // Log performance metrics if available
-    if (typeof performance !== 'undefined' && performance.memory) {
-      console.log(`[${requestId}] Performance metrics:`, {
-        memory: performance.memory,
-        navigation: performance.navigation,
-        timing: performance.timing
-      });
-    }
   }, 15000); // 15 second timeout for all Supabase requests
   
   const fetchPromise = fetch(input, {
@@ -150,6 +169,16 @@ function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Resp
 
 // Export the singleton client
 export const supabase = getSupabaseClient();
+
+// Check if session is available and pre-fetch to warm up auth
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    console.log('Pre-fetching auth session to warm up connection...');
+    supabase.auth.getSession().catch(err => {
+      console.warn('Pre-fetch session failed:', err);
+    });
+  }, 100);
+}
 
 // Enhanced error logging with context
 export async function logError(
