@@ -220,7 +220,7 @@ export default function FlashcardDashboard() {
             description="Start creating flashcard sets to see them here."
             icon={<BookOpen className="h-12 w-12 text-gray-400" />}
             actionText="Create a Set"
-            actionLink="/flashcards/create"
+            actionLink="/flashcards/create-collection"
           />
         ) : (
           <div className="grid md:grid-cols-3 gap-6">
@@ -253,7 +253,7 @@ export default function FlashcardDashboard() {
             description="Start creating and studying flashcard sets to see them here."
             icon={<BookOpen className="h-12 w-12 text-gray-400" />}
             actionText="Create a Set"
-            actionLink="/flashcards/create"
+            actionLink="/flashcards/create-collection"
           />
         ) : (
           <div className="grid md:grid-cols-3 gap-6">

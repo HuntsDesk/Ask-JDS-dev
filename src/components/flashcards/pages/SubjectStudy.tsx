@@ -237,7 +237,7 @@ export default function SubjectStudy() {
         )}
         <p className="text-gray-700 mb-6">No collections in this subject yet.</p>
         <Link
-          to={`/flashcards/create?subject=${id}`}
+          to={`/flashcards/create-collection?subject=${id}`}
           className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
         >
           Create Your First Collection
@@ -265,7 +265,7 @@ export default function SubjectStudy() {
               </button>
               
               <Link
-                to={`/flashcards/create?subject=${id}`}
+                to={`/flashcards/create-collection?subject=${id}`}
                 className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
               >
                 Create New Collection
@@ -276,7 +276,7 @@ export default function SubjectStudy() {
           <div>
             <p className="text-gray-700 mb-6">No flashcards in this subject yet.</p>
             <Link
-              to={`/flashcards/create?subject=${id}`}
+              to={`/flashcards/create-collection?subject=${id}`}
               className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
             >
               Add Cards
@@ -322,7 +322,7 @@ export default function SubjectStudy() {
           
           <div className="flex items-center gap-3 justify-end">
             <Link
-              to={`/flashcards/create?subject=${id}`}
+              to={`/flashcards/create-collection?subject=${id}`}
               className="text-gray-600 hover:text-indigo-600"
               title="Create new collection in this subject"
             >

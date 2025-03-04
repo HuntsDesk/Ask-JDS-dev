@@ -76,7 +76,8 @@ export default function CreateSet() {
     if (!subjectId && !newSubjectName) return 'Please select or create a subject';
     if (cards.length === 0) return 'Please add at least one flashcard';
     
-    for (const [index, card] of cards.entries()) {
+    for (let index = 0; index < cards.length; index++) {
+      const card = cards[index];
       if (!card.question.trim()) return `Card ${index + 1} is missing a question`;
       if (!card.answer.trim()) return `Card ${index + 1} is missing an answer`;
     }

@@ -142,7 +142,8 @@ export default function FlashcardsPage() {
               <Route path="/study/:id" element={<StudyMode />} />
               <Route path="/subjects/:id" element={<SubjectStudy />} />
               <Route path="/subjects" element={<ManageSubjects />} />
-              <Route path="/create" element={<CreateSet />} />
+              <Route path="/create-collection" element={<CreateSet />} />
+              <Route path="/create" element={<Navigate to="/flashcards/create-collection" replace />} />
               <Route path="/create-subject" element={<CreateSubject />} />
               <Route path="/create-flashcard" element={<CreateFlashcardSelect />} />
               <Route path="/flashcards" element={<AllFlashcards />} />

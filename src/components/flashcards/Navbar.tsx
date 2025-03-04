@@ -15,7 +15,7 @@ export default function Navbar() {
     if (path === '/flashcards/collections' || path.startsWith('/flashcards/collections')) {
       return {
         text: 'New Collection',
-        link: '/flashcards/create'
+        link: '/flashcards/create-collection'
       };
     } else if (path === '/flashcards/subjects' || path.startsWith('/flashcards/subjects/')) {
       return {
@@ -27,10 +27,15 @@ export default function Navbar() {
         text: 'New Flashcard',
         link: '/flashcards/create-flashcard'
       };
+    } else if (path.includes('/flashcards/study/') || path.startsWith('/flashcards/study')) {
+      return {
+        text: 'Create Flashcard',
+        link: '/flashcards/create-flashcard'
+      };
     } else {
       return {
         text: 'Create',
-        link: '/flashcards/create'
+        link: '/flashcards/create-collection'
       };
     }
   };
@@ -39,9 +44,10 @@ export default function Navbar() {
 
   return (
     <nav className="bg-white shadow-lg sticky top-0 z-10 w-full">
-      <div className="max-w-full px-4">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-6">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="flex items-center h-16">
+          {/* Left section - Nav links */}
+          <div className="flex items-center space-x-6 flex-shrink-0 mr-4">
             <Link 
               to="/flashcards/collections" 
               className={`flex items-center space-x-1 ${
@@ -79,15 +85,17 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="hidden md:block mx-4 flex-grow max-w-md">
+          {/* Middle section - Search */}
+          <div className="hidden md:block flex-grow mx-4">
             <SearchBar />
           </div>
 
-          <div className="flex items-center">
-            {user && (
+          {/* Right section - Create button */}
+          <div className="flex-shrink-0 ml-4">
+            {user && !location.pathname.includes('/flashcards/create') && (
               <Link 
                 to={createConfig.link} 
-                className="flex items-center gap-1 bg-[#F37022] text-white px-3 py-1.5 rounded-md hover:bg-[#E36012]"
+                className="flex items-center gap-1 bg-[#F37022] text-white px-4 py-2 rounded-md hover:bg-[#E36012]"
               >
                 <PlusCircle className="h-4 w-4" />
                 <span>{createConfig.text}</span>
