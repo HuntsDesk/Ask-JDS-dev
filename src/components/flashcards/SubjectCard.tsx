@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BookOpen, Lock, PlusCircle, Edit, Trash2, CheckCircle2, Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Tooltip from './Tooltip';
@@ -15,6 +15,101 @@ interface SubjectCardProps {
   showDeleteButton: boolean;
 }
 
+interface CardStats {
+  total: number;
+  mastered: number;
+}
+
+// Custom hook to fetch card statistics
+function useCardStats(subjectId: string): {
+  stats: CardStats;
+  loading: boolean;
+  error: Error | null;
+} {
+  const [stats, setStats] = useState<CardStats>({ total: 0, mastered: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    // Skip the effect if we don't have a valid subject ID
+    if (!subjectId) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // First get all collections for this subject
+        const { data: collections, error: collectionError } = await supabase
+          .from('flashcard_collections')
+          .select('id')
+          .eq('subject_id', subjectId);
+          
+        if (collectionError) throw collectionError;
+        
+        // If there are no collections, we can return early with zeros
+        if (!collections || collections.length === 0) {
+          if (isMounted) {
+            setStats({ total: 0, mastered: 0 });
+            setLoading(false);
+          }
+          return;
+        }
+        
+        const collectionIds = collections.map(c => c.id);
+        
+        // Use a single batched query to get both total and mastered counts
+        const [totalResult, masteredResult] = await Promise.all([
+          // Get total card count
+          supabase
+            .from('flashcards')
+            .select('*', { count: 'exact', head: true })
+            .in('collection_id', collectionIds),
+          
+          // Get mastered card count
+          supabase
+            .from('flashcards')
+            .select('*', { count: 'exact', head: true })
+            .in('collection_id', collectionIds)
+            .eq('is_mastered', true)
+        ]);
+        
+        if (totalResult.error) throw totalResult.error;
+        if (masteredResult.error) throw masteredResult.error;
+        
+        if (isMounted) {
+          setStats({
+            total: totalResult.count || 0,
+            mastered: masteredResult.count || 0
+          });
+        }
+      } catch (err) {
+        console.error('Error loading card stats:', err);
+        if (isMounted) {
+          setError(err instanceof Error ? err : new Error('Failed to load card statistics'));
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchStats();
+    
+    // Cleanup function to prevent state updates if component unmounts
+    return () => {
+      isMounted = false;
+    };
+  }, [subjectId]);
+
+  return { stats, loading, error };
+}
+
 export default function SubjectCard({
   id,
   name,
@@ -25,56 +120,13 @@ export default function SubjectCard({
   onDelete,
   showDeleteButton
 }: SubjectCardProps) {
-  const [cardStats, setCardStats] = useState({ total: 0, mastered: 0 });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadCardStats() {
-      try {
-        setLoading(true);
-        
-        // First get all collections for this subject
-        const { data: collections, error: collectionError } = await supabase
-          .from('flashcard_collections')
-          .select('id')
-          .eq('subject_id', id);
-          
-        if (collectionError) throw collectionError;
-        
-        if (collections && collections.length > 0) {
-          const collectionIds = collections.map(c => c.id);
-          
-          // Get total card count
-          const { count: totalCount, error: totalError } = await supabase
-            .from('flashcards')
-            .select('*', { count: 'exact', head: true })
-            .in('collection_id', collectionIds);
-            
-          if (totalError) throw totalError;
-          
-          // Get mastered card count
-          const { count: masteredCount, error: masteredError } = await supabase
-            .from('flashcards')
-            .select('*', { count: 'exact', head: true })
-            .in('collection_id', collectionIds)
-            .eq('is_mastered', true);
-            
-          if (masteredError) throw masteredError;
-          
-          setCardStats({
-            total: totalCount || 0,
-            mastered: masteredCount || 0
-          });
-        }
-      } catch (err) {
-        console.error('Error loading card stats:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    loadCardStats();
-  }, [id]);
+  const { stats, loading, error } = useCardStats(id);
+  
+  // Memoize the percentage calculation to avoid recalculating on every render
+  const masteryPercentage = useMemo(() => {
+    if (stats.total === 0) return 0;
+    return Math.round((stats.mastered / stats.total) * 100);
+  }, [stats.mastered, stats.total]);
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -102,18 +154,39 @@ export default function SubjectCard({
                 <span className="font-medium">{collectionCount}</span> {collectionCount === 1 ? 'collection' : 'collections'}
               </span>
             </div>
+            
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-blue-500" />
               <span className="text-sm text-gray-600">
-                <span className="font-medium">{cardStats.total}</span> cards
+                {loading ? (
+                  <span className="text-gray-400">Loading card data...</span>
+                ) : (
+                  <>
+                    <span className="font-medium">{stats.total}</span> cards
+                  </>
+                )}
               </span>
             </div>
+            
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-500" />
               <span className="text-sm text-gray-600">
-                <span className="font-medium">{cardStats.mastered}</span> mastered
+                {loading ? (
+                  <span className="text-gray-400">Loading...</span>
+                ) : (
+                  <>
+                    <span className="font-medium">{stats.mastered}</span> mastered
+                    {stats.total > 0 && <span className="text-xs ml-1 text-gray-500">({masteryPercentage}%)</span>}
+                  </>
+                )}
               </span>
             </div>
+            
+            {error && (
+              <div className="flex items-center gap-2 text-red-500 text-xs mt-1">
+                <span>Failed to load statistics. Please try again later.</span>
+              </div>
+            )}
           </div>
         </div>
         

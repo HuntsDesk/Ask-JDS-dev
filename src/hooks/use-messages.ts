@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/types';
 import { useToast } from './use-toast';
+import { setPaywallActive } from './use-toast';
 import { logError } from '@/lib/supabase';
 import { createAIProvider } from '@/lib/ai/provider-factory';
 import { useSettings } from './use-settings';
 import type { AIProvider } from '@/types/ai';
+import { Toast } from '@/components/ui/toast';
 import { 
   incrementUserMessageCount, 
   hasReachedFreeMessageLimit,
@@ -23,7 +25,8 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   const [showPaywall, setShowPaywall] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const { toast } = useToast();
+  const [preservedMessage, setPreservedMessage] = useState<string | undefined>(undefined);
+  const { toast, dismiss } = useToast();
   const isFirstMessageRef = useRef(true);
   const userMessageCountRef = useRef(0);
   // Add a ref to track message IDs we've already added
@@ -187,6 +190,7 @@ Respond with ONLY the title, no quotes or additional text.`;
           console.log(`No messages found for thread ${threadId} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
           setMessages([]);
           success = true; // Consider empty results a success
+          setLoading(false); // Set loading to false immediately for empty threads
           break; // Exit the retry loop since we have a valid (empty) result
         }
       } catch (error) {
@@ -270,7 +274,7 @@ Respond with ONLY the title, no quotes or additional text.`;
   }, [threadId]);
 
   // Check if user has reached message limit before sending
-  const checkMessageLimit = useCallback(async (): Promise<boolean> => {
+  const checkMessageLimit = useCallback(async (messageContent?: string): Promise<boolean> => {
     try {
       // Refresh subscription status before checking limit
       const subscribed = await hasActiveSubscription();
@@ -286,28 +290,88 @@ Respond with ONLY the title, no quotes or additional text.`;
       setMessageCount(count);
       
       const hasReachedLimit = count >= FREE_MESSAGE_LIMIT;
+      
+      // If limit reached and a message was provided, preserve it
+      if (hasReachedLimit && messageContent) {
+        setPreservedMessage(messageContent);
+        
+        // Dismiss any active toasts to prevent them from appearing alongside the paywall
+        dismiss();
+      }
+      
       setShowPaywall(hasReachedLimit);
       return hasReachedLimit;
     } catch (error) {
       console.error('Error checking message limit:', error);
       return false;
     }
-  }, []);
+  }, [dismiss]);
 
   // Handle closing the paywall
   const handleClosePaywall = useCallback(() => {
+    // Reset the global paywall flag first
+    setPaywallActive(false);
+    
+    // Keep preservedMessage in state so it can be used when the paywall is closed
+    // This ensures it's still available for the ChatInterface component
     setShowPaywall(false);
+    
+    // We don't clear preservedMessage here because we need it to be picked up
+    // by the ChatInterface component after the paywall is closed
   }, []);
+
+  // Effect to set paywall state
+  useEffect(() => {
+    // Set the global flag whenever showPaywall changes
+    setPaywallActive(showPaywall);
+    
+    // Clean up on unmount
+    return () => {
+      if (showPaywall) {
+        setPaywallActive(false);
+      }
+    };
+  }, [showPaywall]);
 
   const sendMessage = useCallback(async (content: string) => {
     if (!threadId || !aiProvider.current) return null;
     if (!content.trim()) return null;
 
-    // Check if user has reached message limit
-    const hasReachedLimit = await checkMessageLimit();
-    if (hasReachedLimit) {
+    // First, immediately dismiss any existing toasts before any checks
+    dismiss();
+
+    // Set the global flag to prevent new toasts
+    setPaywallActive(true);
+
+    // Check if user has reached message limit - do this silently to avoid toast flashes
+    const count = await getUserMessageCount();
+    const hasSubscription = await hasActiveSubscription();
+    
+    // Immediately check for limit and show paywall if needed
+    if (!hasSubscription && count >= FREE_MESSAGE_LIMIT) {
+      // We've hit the limit - preserve message and show paywall without error toasts
+      setPreservedMessage(content);
+      
+      // Ensure all toasts are dismissed before showing paywall
+      dismiss();
+      
+      // Keep the paywall active flag on
+      setPaywallActive(true);
+      
+      // Set a tiny timeout to ensure the dismiss operation completes before showing paywall
+      setTimeout(() => {
+        setShowPaywall(true);
+      }, 0);
+      
       return null;
     }
+    
+    // If we reached here, we're not hitting the limit - can allow toasts again
+    setPaywallActive(false);
+    
+    // Update the message count 
+    setMessageCount(count);
+    setIsSubscribed(hasSubscription);
 
     let optimisticUserMessage: Message | null = null;
 
@@ -474,6 +538,7 @@ Respond with ONLY the title, no quotes or additional text.`;
     handleClosePaywall,
     messageCount,
     messageLimit: FREE_MESSAGE_LIMIT,
-    isSubscribed
+    isSubscribed,
+    preservedMessage
   };
 }

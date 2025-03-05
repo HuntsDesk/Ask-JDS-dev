@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import type { AIProvider } from './provider';
 import { OpenAIProvider } from './openai-provider';
@@ -6,6 +6,7 @@ import { GeminiProvider } from './gemini-provider';
 
 export function useAIProvider() {
   const providerRef = useRef<AIProvider | null>(null);
+  const [settingsVersion, setSettingsVersion] = useState(0);
 
   useEffect(() => {
     async function initProvider() {
@@ -40,7 +41,24 @@ export function useAIProvider() {
     }
 
     initProvider();
-  }, []);
+
+    // Subscribe to changes in the ai_settings table
+    const subscription = supabase
+      .channel('ai_settings_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'ai_settings' 
+      }, () => {
+        console.log('AI settings changed, reinitializing provider');
+        setSettingsVersion(prev => prev + 1);
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [settingsVersion]);
 
   return providerRef;
 }

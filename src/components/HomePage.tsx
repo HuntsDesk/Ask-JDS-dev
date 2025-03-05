@@ -34,6 +34,7 @@ import { supabase } from '@/lib/supabase';
 import { FREE_MESSAGE_LIMIT } from '@/lib/subscription';
 import { hasActiveSubscription } from '@/lib/subscription';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { OptimizedImage } from '@/components/ui/optimized-image';
 
 // Define the benefits array
 const benefits = [
@@ -156,10 +157,11 @@ export function HomePage() {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-3">
-              <img 
+              <OptimizedImage 
                 src="/images/JDSimplified_Logo.png" 
                 alt="JD Simplified Logo" 
                 className="h-12" 
+                priority={true}
               />
             </Link>
           </div>
@@ -515,7 +517,7 @@ export function HomePage() {
             {/* Logo and Description */}
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
-                <img 
+                <OptimizedImage 
                   src="/images/JDSimplified_Logo_wht.png" 
                   alt="JD Simplified Logo" 
                   className="h-12" 

@@ -21,6 +21,8 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import FlashcardsPage from '@/components/flashcards/FlashcardsPage';
 import { AlertTriangle } from 'lucide-react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query-client';
 
 // Create a context for the selected thread
 export const SelectedThreadContext = createContext<{
@@ -31,15 +33,11 @@ export const SelectedThreadContext = createContext<{
   setSelectedThreadId: () => {},
 });
 
-// Create a context for sidebar state management
+// Create a context for the sidebar
 export const SidebarContext = createContext<{
-  isPinned: boolean;
-  setIsPinned: (isPinned: boolean) => void;
   isExpanded: boolean;
-  setIsExpanded: (isExpanded: boolean) => void;
+  setIsExpanded: (expanded: boolean) => void;
 }>({
-  isPinned: false,
-  setIsPinned: () => {},
   isExpanded: false,
   setIsExpanded: () => {},
 });
@@ -62,30 +60,10 @@ function SelectedThreadProvider({ children }: { children: React.ReactNode }) {
 
 // Provider component for sidebar state
 function SidebarProvider({ children }: { children: React.ReactNode }) {
-  // Initialize with localStorage values if available
-  const [isPinned, setIsPinned] = useState<boolean>(() => {
-    const storedValue = localStorage.getItem('sidebar-pinned');
-    return storedValue ? storedValue === 'true' : false;
-  });
-  
-  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
-    return isPinned; // Start expanded if pinned
-  });
-  
-  // Save pinned state to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('sidebar-pinned', isPinned.toString());
-    
-    // If we're pinning, also expand
-    if (isPinned && !isExpanded) {
-      setIsExpanded(true);
-    }
-  }, [isPinned, isExpanded]);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   
   return (
     <SidebarContext.Provider value={{ 
-      isPinned, 
-      setIsPinned, 
       isExpanded, 
       setIsExpanded 
     }}>
@@ -104,7 +82,7 @@ const router = createBrowserRouter(
         path="/chat/:id" 
         element={
           <ProtectedRoute>
-            <ChatLayout />
+            <ChatLayout key="chat-with-id" />
           </ProtectedRoute>
         } 
       />
@@ -112,7 +90,7 @@ const router = createBrowserRouter(
         path="/chat" 
         element={
           <ProtectedRoute>
-            <ChatLayout />
+            <ChatLayout key="chat-without-id" />
           </ProtectedRoute>
         } 
       />
@@ -209,34 +187,36 @@ function App() {
   }
 
   return (
-    <ErrorBoundary
-      fallback={
-        <div className="fixed inset-0 flex items-center justify-center bg-background">
-          <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full text-center">
-            <h2 className="text-xl font-bold mb-4">Application Error</h2>
-            <p className="mb-4">
-              The application encountered an unexpected error. Please try refreshing the page.
-            </p>
-            <Button 
-              onClick={() => window.location.reload()}
-              className="w-full"
-            >
-              Reload Application
-            </Button>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary
+        fallback={
+          <div className="fixed inset-0 flex items-center justify-center bg-background">
+            <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full text-center">
+              <h2 className="text-xl font-bold mb-4">Application Error</h2>
+              <p className="mb-4">
+                The application encountered an unexpected error. Please try refreshing the page.
+              </p>
+              <Button 
+                onClick={() => window.location.reload()}
+                className="w-full"
+              >
+                Reload Application
+              </Button>
+            </div>
           </div>
-        </div>
-      }
-    >
-      <AuthProvider>
-        <SelectedThreadProvider>
-          <SidebarProvider>
-            <RouterProvider router={router} />
-            <Toaster />
-            <OfflineIndicator />
-          </SidebarProvider>
-        </SelectedThreadProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+        }
+      >
+        <AuthProvider>
+          <SelectedThreadProvider>
+            <SidebarProvider>
+              <RouterProvider router={router} />
+              <Toaster />
+              <OfflineIndicator />
+            </SidebarProvider>
+          </SelectedThreadProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
 }
 

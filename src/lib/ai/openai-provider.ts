@@ -8,6 +8,7 @@ export class OpenAIProvider implements AIProvider {
 
   async generateResponse(prompt: string, threadMessages: Message[] = []): Promise<string> {
     try {
+      console.log('🔵🔵🔵 USING OPENAI PROVIDER 🔵🔵🔵');
       const systemPrompt = await getSystemPrompt();
       
       // Format messages correctly for OpenAI

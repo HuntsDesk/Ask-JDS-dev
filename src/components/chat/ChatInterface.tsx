@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Message } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { SendIcon, Loader2, Info } from 'lucide-react';
+import { SendIcon, Loader2, Info, Shield } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import ReactMarkdown from 'react-markdown';
 import { 
@@ -14,6 +14,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Progress } from '@/components/ui/progress';
+import { VirtualMessageList } from './VirtualMessageList';
+import { ChatMessage } from './ChatMessage';
 
 interface ChatInterfaceProps {
   threadId: string;
@@ -24,6 +26,8 @@ interface ChatInterfaceProps {
   onRefresh: () => void;
   messageCount?: number;
   messageLimit?: number;
+  preservedMessage?: string;
+  showPaywall: boolean;
 }
 
 export function ChatInterface({ 
@@ -34,10 +38,12 @@ export function ChatInterface({
   onSend, 
   onRefresh,
   messageCount = 0,
-  messageLimit = 10
+  messageLimit = 10,
+  preservedMessage,
+  showPaywall
 }: ChatInterfaceProps) {
   const { user } = useAuth();
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState(preservedMessage || '');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
@@ -106,13 +112,76 @@ export function ChatInterface({
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    // Immediate scroll for the first render and then a delayed scroll to handle any layout shifts
+    if (messages.length > 0) {
+      scrollToBottom(false);
+      // Additional scroll after layout stabilizes
+      setTimeout(() => scrollToBottom(true), 300);
     }
+  }, [messages.length]);
+
+  // Force scroll to bottom when new messages are added or removed
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Use immediate scroll without smooth behavior first
+      scrollToBottom(false);
+      
+      // Then use smooth scrolling after a short delay, but only if not sending
+      // This prevents competing scroll behaviors when a message is being sent
+      if (!sending) {
+        const timeoutId = setTimeout(() => scrollToBottom(true), 100);
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [messages.length, sending]);
+
+  // Handle scroll when sending state changes
+  useEffect(() => {
+    if (sending) {
+      // Short delay to let the UI update with the sending indicator first
+      const timeoutId = setTimeout(() => scrollToBottom(false), 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [sending]);
+
+  // Update message input when preservedMessage changes
+  useEffect(() => {
+    if (preservedMessage) {
+      setNewMessage(preservedMessage);
+    }
+  }, [preservedMessage]);
+
+  const scrollToBottom = (smooth = true) => {
+    if (!messagesContainerRef.current) return;
+    
+    // First try scrolling the container with the appropriate behavior
+    const container = messagesContainerRef.current;
+    const scrollBehavior = smooth ? 'smooth' : 'auto';
+    
+    // Use requestAnimationFrame to ensure the scroll happens after layout
+    requestAnimationFrame(() => {
+      // Calculate the target scroll position
+      const scrollTarget = container.scrollHeight - container.clientHeight;
+      
+      // Only use smooth scrolling for small scroll distances to avoid bounce
+      const currentPosition = container.scrollTop;
+      const distance = Math.abs(scrollTarget - currentPosition);
+      const shouldUseSmooth = smooth && distance < 500;
+      
+      // Apply the scroll with the determined behavior
+      container.scrollTo({
+        top: scrollTarget,
+        behavior: shouldUseSmooth ? 'smooth' : 'auto'
+      });
+      
+      // Also try scrolling the end ref as a fallback, but only if we're not using smooth scrolling
+      if (messagesEndRef.current && !shouldUseSmooth) {
+        messagesEndRef.current.scrollIntoView({
+          behavior: 'auto',
+          block: 'end'
+        });
+      }
+    });
   };
 
   const handleSend = async () => {
@@ -123,43 +192,87 @@ export function ChatInterface({
     setSending(true);
     
     const messageContent = newMessage.trim();
-    setNewMessage('');
+    // Only clear the message if no errors occur - we'll restore it if needed
+    const originalMessage = messageContent;
     
+    // We're not clearing the message field until we know we won't hit the limit
+    // This helps prevent flickering of UI elements
+    
+    // Track whether we've shown the timeout warning
+    let timeoutWarningShown = false;
+    let limitReached = false;
+    
+    // First, do a preliminary check for message limit to avoid UI flicker
+    // Instead of checking here, we'll let the hook handle it
+    
+    // Don't clear message text until we're sure we won't hit the limit
     try {
-      // Set up a timeout for message sending
-      const sendPromise = onSend(messageContent);
-      const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error('Message sending timed out')), 8000);
-      });
+      // Set up a timeout to show a warning but not fail the request
+      const timeoutId = setTimeout(() => {
+        // Only show the toast if we're not hitting the message limit
+        if (!showPaywall) {
+          timeoutWarningShown = true;
+          toast({
+            title: "Processing your message",
+            description: "This is taking longer than usual. The AI is working on your response, please wait...",
+            variant: "warning",
+            duration: 15000,
+          });
+        }
+      }, 20000); // Show warning after 20 seconds
       
-      // Race the message sending against the timeout
-      const result = await Promise.race([sendPromise, timeoutPromise]);
+      // Actually send the message - this will trigger the paywall if needed
+      const result = await onSend(messageContent);
       
+      // Now it's safe to clear the message if we didn't hit the limit
+      if (!showPaywall) {
+        setNewMessage('');
+      }
+      
+      // Clear the timeout since we got a response
+      clearTimeout(timeoutId);
+      
+      // Handle different failure cases
       if (!result) {
-        console.error('Failed to send message, result was null');
-        toast({
-          title: "Failed to send message",
-          description: "The message couldn't be sent. The database might be slow to respond.",
-          variant: "destructive",
-        });
+        if (showPaywall) {
+          // Message limit reached case - don't show an error toast
+          console.log('Message limit reached, showing paywall');
+          limitReached = true;
+          // Don't clear message text in this case
+        } else {
+          // Other failure case
+          console.error('Failed to send message, result was null');
+          toast({
+            title: "Failed to send message",
+            description: "The message couldn't be sent properly. You may need to try again.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Successful message, clear the input
+        setNewMessage('');
       }
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Check if this was a timeout error
-      const errorMessage = error instanceof Error && error.message === 'Message sending timed out'
-        ? "Database is responding slowly. Please try again in a moment."
-        : "We couldn't send your message. Please try again.";
+      // Only show an error toast if we haven't already shown the timeout warning
+      // and we're not showing the paywall
+      if (!timeoutWarningShown && !showPaywall && !limitReached) {
+        const errorMessage = error instanceof Error 
+          ? error.message
+          : "We couldn't send your message. Please try again.";
+        
+        toast({
+          title: "Error sending message",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
       
-      toast({
-        title: "Error sending message",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      
-      // Keep the message content in the input field so the user doesn't lose their message
-      setNewMessage(messageContent);
-      setSendError(errorMessage);
+      // Only show error message if not hitting message limit
+      if (!showPaywall && !limitReached) {
+        setSendError("An error occurred while sending your message. Your message has been restored to the input field.");
+      }
     } finally {
       setSending(false);
     }
@@ -194,159 +307,124 @@ export function ChatInterface({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-hidden">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-[calc(100vh-150px)]">
-            <LoadingSpinner size="lg" />
-            <div className="mt-4 w-full max-w-md px-4">
-              <p className="text-sm text-gray-500 mb-2 text-center">{getLoadingMessage()}</p>
-              <Progress value={loadingProgress} className="h-1 mb-2" />
-              <p className="text-xs text-gray-400 text-center">
-                {loadingProgress < 95 ? `${Math.round(loadingProgress)}% complete` : "Finalizing..."}
-              </p>
-            </div>
-            {showTimeoutWarning && loadingTimeout && (
-              <div className="mt-4 max-w-md text-center px-4">
-                <p className="text-sm text-amber-600">
-                  The database is responding slowly. Your messages will appear shortly.
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  This might take a few more seconds. Thanks for your patience.
-                </p>
-              </div>
-            )}
-          </div>
-        ) : loadingTimeout && showTimeoutWarning ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="text-center max-w-md mx-auto p-6">
-              <h3 className="text-xl font-semibold mb-2">Taking longer than expected</h3>
-              <p className="mb-4 text-gray-600">
-                We're having trouble loading your messages. The database might be slow to respond.
-              </p>
-              <div className="flex justify-center">
-                <Button onClick={onRefresh} variant="default">
-                  Refresh
-                </Button>
+    <div className="flex flex-col h-full w-full chat-container pl-0 md:pl-0">
+      {/* Messages area - should take most of the space */}
+      <div className="flex-1 overflow-hidden message-container w-full">
+        <div 
+          ref={messagesContainerRef}
+          className="flex-1 h-full w-full overflow-y-auto px-4 pb-2 custom-scrollbar"
+        >
+          {loading && messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center max-w-md text-center p-4">
+                <LoadingSpinner size="lg" />
+                <p className="mt-4">{getLoadingMessage()}</p>
+                {loadingTimeout && (
+                  <div className="mt-4 flex flex-col items-center">
+                    <p className="mb-2 text-muted-foreground">
+                      This is taking longer than expected. You can try refreshing.
+                    </p>
+                    <Button onClick={onRefresh} variant="outline">
+                      Refresh
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ) : (
-          <div 
-            ref={messagesContainerRef}
-            className="p-4 overflow-y-auto h-full"
-          >
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <h3 className="text-xl font-semibold mb-2">Start a new conversation</h3>
-                <p className="mb-4 text-gray-600 max-w-md">
-                Engage in insightful legal discussions. Whether you're preparing for the bar exam, 
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center max-w-md text-center p-4">
+                <Shield className="h-16 w-16 mb-4 text-[#F37022]" />
+                <h3 className="text-xl font-semibold mb-2">Welcome to Ask JDS</h3>
+                <p className="text-muted-foreground">
+                Your trusted legal AI research assistant. Whether you're researching a legal question, 
                 navigating law school, or exploring complex legal topics, Ask JDS is here to provide 
                 clear, reliable, and knowledgeable guidance.
                 </p>
               </div>
-            ) : (
-              messages.map((message) => (
-                <div 
-                  key={message.id} 
-                  className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
-                  style={{
-                    animation: 'fadeIn 0.2s ease-in-out'
-                  }}
-                >
-                  <div className={`max-w-[80%] rounded-lg p-3 ${
-                    message.role === 'assistant'
-                      ? 'bg-muted text-muted-foreground' 
-                      : 'bg-primary text-primary-foreground'
-                  }`}>
-                    <ReactMarkdown 
-                      className="prose dark:prose-invert max-w-none text-sm md:text-base break-words [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:mt-4 [&>ul]:mb-4 [&>ul:last-child]:mb-0"
-                    >
-                      {message.content}
-                    </ReactMarkdown>
+            </div>
+          ) : (
+            <div className="pb-0">
+              {messages.map((message, index) => (
+                <ChatMessage 
+                  key={message.id || `temp-${index}`} 
+                  message={message}
+                  isLastMessage={index === messages.length - 1}
+                />
+              ))}
+              <div ref={messagesEndRef} style={{ height: '1px' }} />
+              
+              {/* Only show the indicator when actually sending, with no permanent reserved space */}
+              {sending && (
+                <div className="flex items-start px-4 my-2">
+                  <div className="flex-1 bg-muted/80 p-3 rounded-lg shadow-sm border border-border/30">
+                    <div className="flex items-center">
+                      <LoadingSpinner size="sm" className="mr-2 text-primary" />
+                      <span className="text-sm font-medium">Ask JDS is responding...</span>
+                    </div>
                   </div>
                 </div>
-              ))
-            )}
-            
-            {sending && (
-              <div className="flex items-start mb-4">
-                <div className="flex-1 bg-muted p-3 rounded-lg">
-                  <div className="flex items-center">
-                    <LoadingSpinner size="sm" className="mr-2 text-muted-foreground" />
-                    <span className="text-sm">Ask JDS is responding...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </div>
       </div>
       
-      <div className="border-t p-4">
-        {/* Message count indicator */}
-        {isNearLimit && (
-          <div className="mb-2 text-sm text-amber-500 flex items-center">
-            <Info className="w-4 h-4 mr-1" />
-            You have {remainingMessages} free {remainingMessages === 1 ? 'message' : 'messages'} remaining this month.
-          </div>
-        )}
-        
-        {/* Message send error indicator */}
+      {/* Input area - fixed height at bottom */}
+      <div className="input-container pt-2 pb-4 px-4 border-t border-border w-full">
         {sendError && (
-          <div className="mb-2 text-sm text-red-500 flex items-center">
-            <Info className="w-4 h-4 mr-1" />
+          <div className="mb-2 p-2 text-sm rounded bg-red-50 text-red-600">
             {sendError}
           </div>
         )}
         
-        <div className="flex gap-2">
-          <Textarea
-            value={newMessage}
-            onChange={handleInputChange}
-            placeholder="Type your message..."
-            className="flex-1"
-            disabled={loading || (loadingTimeout && showTimeoutWarning)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={handleSend}
-                  disabled={loading || (loadingTimeout && showTimeoutWarning) || sending || !newMessage.trim()}
-                  variant={sending ? "secondary" : "default"}
-                  className={`transition-colors ${
-                    sending 
-                      ? "" 
-                      : "!bg-[#FF5A1F] hover:!bg-[#FF5A1F]/90 !text-white"
-                  }`}
-                >
-                  <div className="relative w-4 h-4">
-                    <SendIcon className={`w-4 h-4 absolute inset-0 transition-opacity duration-200 ${
-                      sending ? 'opacity-0' : 'opacity-100'
-                    }`} />
-                    <div className={`absolute inset-0 transition-opacity duration-200 ${
-                      sending ? 'opacity-100' : 'opacity-0'
-                    }`}>
-                      <LoadingSpinner size="sm" />
-                    </div>
-                  </div>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Send message ({messageCount}/{messageLimit} used)</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend();
+          }}
+          className="flex items-end gap-2 w-full"
+        >
+          <div className="relative flex-1 w-full">
+            <Textarea
+              value={newMessage}
+              onChange={handleInputChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Type your message..."
+              className="min-h-24 max-h-[200px] py-3 resize-none pr-3 transition-none w-full"
+              disabled={sending || loading}
+            />
+          </div>
+          
+          <Button 
+            size="sm" 
+            type="submit" 
+            disabled={!newMessage.trim() || sending || loading}
+            className={`rounded-md p-2 bg-[#F37022] hover:bg-[#E35D10] text-white ${!newMessage.trim() ? 'opacity-50' : ''}`}
+            aria-label="Send message"
+          >
+            {sending ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <SendIcon className="h-5 w-5" />
+            )}
+            <span className="sr-only">Send</span>
+          </Button>
+        </form>
+        
+        {isNearLimit && (
+          <div className="mt-2 p-2 rounded bg-amber-50 text-amber-700">
+            <p className="text-sm flex items-center">
+              <Info className="h-4 w-4 mr-2 flex-shrink-0" />
+              You have {remainingMessages} message{remainingMessages !== 1 ? 's' : ''} left before hitting your daily limit.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

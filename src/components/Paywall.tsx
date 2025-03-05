@@ -4,15 +4,39 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { createCheckoutSession, FREE_MESSAGE_LIMIT } from '@/lib/subscription';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
+import { setPaywallActive } from '@/hooks/use-toast';
 
 interface PaywallProps {
   onCancel?: () => void;
+  preservedMessage?: string;
 }
 
-export function Paywall({ onCancel }: PaywallProps) {
+export function Paywall({ onCancel, preservedMessage }: PaywallProps) {
   const [isLoading, setIsLoading] = React.useState(false);
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
 
+  // Set the global paywall flag when this component mounts
+  React.useEffect(() => {
+    // Dismiss toasts immediately when the component mounts
+    dismiss();
+    
+    // Set the global flag
+    setPaywallActive(true);
+    
+    // And also set up a small delay to ensure all toast animations are cleared
+    const timeoutId = setTimeout(() => {
+      dismiss();
+    }, 50);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      // Reset the global flag when unmounting
+      setPaywallActive(false);
+      // Also dismiss toasts when unmounting to avoid flashes
+      dismiss();
+    };
+  }, [dismiss]);
+  
   const handleSubscribe = async () => {
     try {
       setIsLoading(true);
@@ -38,19 +62,33 @@ export function Paywall({ onCancel }: PaywallProps) {
       setIsLoading(false);
     }
   };
+  
+  const handleCancel = () => {
+    // Reset the global paywall flag
+    setPaywallActive(false);
+  
+    // Dismiss any toasts before closing the paywall
+    dismiss();
+    
+    // Call the onCancel callback
+    if (onCancel) {
+      onCancel();
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
+      <Card className="max-w-md w-full"
+        style={{ position: 'absolute', zIndex: 9999 }}>
         <CardHeader>
-          <CardTitle className="text-2xl">Message Limit Reached</CardTitle>
+          <CardTitle className="text-2xl">Your AI study buddy is taking a recess.</CardTitle>
           <CardDescription>
-            You've used all {FREE_MESSAGE_LIMIT} of your free messages for this month.
+            You've hit your free message limit, but don't worry—you can upgrade for unlimited access.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg bg-muted p-4">
-            <h3 className="font-medium mb-2">Upgrade to Premium</h3>
+            <h3 className="font-medium mb-2">For just $5/month, you get:</h3>
             <ul className="space-y-2 text-sm">
               <li className="flex items-center">
                 <svg
@@ -65,7 +103,7 @@ export function Paywall({ onCancel }: PaywallProps) {
                     clipRule="evenodd"
                   />
                 </svg>
-                Unlimited messages
+                Unlimited Ask JDS Messaging (because law school never stops)
               </li>
               <li className="flex items-center">
                 <svg
@@ -80,7 +118,7 @@ export function Paywall({ onCancel }: PaywallProps) {
                     clipRule="evenodd"
                   />
                 </svg>
-                Priority support
+                Answers trained on real law student resources
               </li>
               <li className="flex items-center">
                 <svg
@@ -95,18 +133,33 @@ export function Paywall({ onCancel }: PaywallProps) {
                     clipRule="evenodd"
                   />
                 </svg>
-                Early access to new features
+                JDS Flashcards – use ours or create your own
+              </li>
+              <li className="flex items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="w-5 h-5 mr-2 text-green-500"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                A study buddy who won't cold-call you
               </li>
             </ul>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold">$9.99/month</p>
-            <p className="text-sm text-muted-foreground">Cancel anytime</p>
+            <p className="text-2xl font-bold">$5/month</p>
+            <p className="text-sm italic text-muted-foreground">Smarter than your group chat. Cheaper than failing the bar.</p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <Button 
-            className="w-full" 
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white" 
             onClick={handleSubscribe}
             disabled={isLoading}
           >
@@ -120,7 +173,7 @@ export function Paywall({ onCancel }: PaywallProps) {
             <Button 
               variant="outline" 
               className="w-full" 
-              onClick={onCancel}
+              onClick={handleCancel}
               disabled={isLoading}
             >
               Maybe Later

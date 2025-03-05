@@ -330,3 +330,84 @@
     transition: opacity 0.1s linear;
   }
 }
+
+/* Custom scrollbar for virtual list */
+.virtual-list-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 155, 155, 0.4) transparent;
+  overflow-x: hidden !important;
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
+
+.virtual-list-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.virtual-list-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.virtual-list-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.3);
+  border-radius: 20px;
+}
+
+.virtual-list-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.5);
+}
+
+/* Add this to ensure parent containers don't add padding */
+.virtual-list-scrollbar > div {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Ensure chat container takes full height */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Message container should take available space */
+.message-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  will-change: transform;
+  contain: layout;
+  margin-bottom: 0;
+}
+
+/* Make sure the scrollable container inside takes full height */
+.message-container > div {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0;
+}
+
+/* Input container fixed height */
+.input-container {
+  position: relative;
+  z-index: 10;
+  background-color: var(--background);
+  flex-shrink: 0;
+  contain: layout;
+  margin-top: 0;
+  border-top-width: 1px;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, ArrowRight, Check, X, RotateCcw, BookOpen } from 'lucide-react';
@@ -43,6 +43,16 @@ export default function FlashcardStudy() {
     remaining: 0,
     mastered: 0
   });
+
+  // Create a memoized shuffle function
+  const shuffleCards = useCallback((cards) => {
+    return [...cards].sort(() => Math.random() - 0.5);
+  }, []);
+
+  // Memoize the calculation of mastered cards
+  const masteredCount = useMemo(() => {
+    return flashcards.filter(card => card.is_mastered).length;
+  }, [flashcards]);
 
   useEffect(() => {
     if (collectionId) {
@@ -89,9 +99,8 @@ export default function FlashcardStudy() {
       if (!cardsData || cardsData.length === 0) {
         setFlashcards([]);
       } else {
-        // Shuffle the cards
-        const shuffled = [...cardsData].sort(() => Math.random() - 0.5);
-        setFlashcards(shuffled);
+        // Use the memoized shuffle function
+        setFlashcards(shuffleCards(cardsData));
       }
       
       setCollection(collectionData);
@@ -104,13 +113,13 @@ export default function FlashcardStudy() {
   }
 
   function updateStats() {
-    const mastered = flashcards.filter(card => card.is_mastered).length;
+    // Use the memoized mastered count
     const remaining = flashcards.length - currentIndex;
     
     setStats({
       ...stats,
       remaining,
-      mastered
+      mastered: masteredCount
     });
   }
 
@@ -203,9 +212,8 @@ export default function FlashcardStudy() {
   }
 
   function handleRestartStudy() {
-    // Shuffle the cards again
-    const shuffled = [...flashcards].sort(() => Math.random() - 0.5);
-    setFlashcards(shuffled);
+    // Use the memoized shuffle function
+    setFlashcards(shuffleCards(flashcards));
     setCurrentIndex(0);
     setShowAnswer(false);
     setStudyComplete(false);
@@ -213,7 +221,7 @@ export default function FlashcardStudy() {
       correct: 0,
       incorrect: 0,
       remaining: flashcards.length,
-      mastered: flashcards.filter(card => card.is_mastered).length
+      mastered: masteredCount
     });
   }
 

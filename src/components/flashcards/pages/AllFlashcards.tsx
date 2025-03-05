@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FileText, Check, EyeOff, Eye, Trash2, Filter, BookOpen, FileEdit } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -9,6 +9,7 @@ import Toast from '../Toast';
 import EmptyState from '../EmptyState';
 import ErrorMessage from '../ErrorMessage';
 import DeleteConfirmation from '../DeleteConfirmation';
+import { usePersistedState } from '@/hooks/use-persisted-state';
 
 interface Flashcard {
   id: string;
@@ -30,15 +31,17 @@ export default function AllFlashcards() {
   const { user } = useAuth();
   const { toast, showToast, hideToast } = useToast();
   const [cards, setCards] = useState<Flashcard[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showMastered, setShowMastered] = useState(false);
-  const [cardToDelete, setCardToDelete] = useState<Flashcard | null>(null);
-  const [filterSubject, setFilterSubject] = useState<string>('all');
-  const [filterCollection, setFilterCollection] = useState<string>('all');
   const [subjects, setSubjects] = useState<{id: string, name: string}[]>([]);
   const [collections, setCollections] = useState<{id: string, title: string, subject_id: string}[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [cardToDelete, setCardToDelete] = useState<Flashcard | null>(null);
+
+  // Replace regular state with persisted state
+  const [showMastered, setShowMastered] = usePersistedState<boolean>('flashcards-show-mastered', true);
+  const [filterSubject, setFilterSubject] = usePersistedState<string>('flashcards-filter-subject', 'all');
+  const [filterCollection, setFilterCollection] = usePersistedState<string>('flashcards-filter-collection', 'all');
+  const [showFilters, setShowFilters] = usePersistedState<boolean>('flashcards-show-filters', false);
 
   useEffect(() => {
     loadData();
@@ -117,12 +120,13 @@ export default function AllFlashcards() {
     }
   }
 
-  const getFilteredCollections = () => {
+  // Memoize the filtered collections list
+  const filteredCollections = useMemo(() => {
     if (filterSubject === 'all') {
       return collections;
     }
     return collections.filter(c => c.subject_id === filterSubject);
-  };
+  }, [collections, filterSubject]);
 
   const handleEditCard = (card: Flashcard) => {
     navigate(`/flashcards/manage/${card.collection_id}`, { 
@@ -265,7 +269,7 @@ export default function AllFlashcards() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#F37022] focus:border-[#F37022]"
               >
                 <option value="all">All Collections</option>
-                {getFilteredCollections().map((collection) => (
+                {filteredCollections.map((collection) => (
                   <option key={collection.id} value={collection.id}>
                     {collection.title}
                   </option>

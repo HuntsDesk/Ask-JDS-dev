@@ -8,82 +8,110 @@ import { Loader2 } from 'lucide-react';
 import { Paywall } from '@/components/Paywall';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { SelectedThreadContext, SidebarContext } from '@/App';
 
 export function ChatLayout() {
   const { user, signOut } = useAuth();
-  const [activeThread, setActiveThread] = useState<string | null>(null);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  const [messagesLoadingTimeout, setMessagesLoadingTimeout] = useState(false);
-  const { toast } = useToast();
-  const { id: threadIdFromUrl } = useParams<{ id?: string }>();
-  const navigate = useNavigate();
-  const { selectedThreadId, setSelectedThreadId } = useContext(SelectedThreadContext);
   const { isExpanded, setIsExpanded } = useContext(SidebarContext);
+  const [activeThread, setActiveThread] = useState<string | null>(null);
+  const [activeThreadTitle, setActiveThreadTitle] = useState<string>('');
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [threadsLoading, setThreadsLoading] = useState(true);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isThreadDeletion, setIsThreadDeletion] = useState(false);
+  
+  const navigate = useNavigate();
+  const params = useParams<{ threadId?: string }>();
+  const [searchParams] = useSearchParams();
+  
+  const threadId = params.threadId || null;
+  const initialTitle = threadId ? searchParams.get('title') || 'New Chat' : 'New Chat';
 
   const {
-    threads,
-    loading: threadsLoading,
+    threads: originalThreads,
+    loading: originalThreadsLoading,
     createThread,
     updateThread,
-    deleteThread
+    deleteThread,
+    refetchThreads
   } = useThreads();
+
+  const { toast, dismiss } = useToast();
+  const { selectedThreadId, setSelectedThreadId } = useContext(SelectedThreadContext);
+  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
+  const messagesTimeoutIdRef = useRef<NodeJS.Timeout | null>(null);
 
   // A helper function to log thread details
   const logThreadInfo = () => {
     console.log('----------- Thread Debug Info -----------');
-    console.log('ThreadID from URL:', threadIdFromUrl);
+    console.log('ThreadID from URL:', threadId);
     console.log('Global selectedThreadId:', selectedThreadId);
     console.log('Component activeThread:', activeThread);
-    console.log('Available Threads:', threads.map(t => ({id: t.id, title: t.title})));
-    console.log('Thread loading:', threadsLoading);
+    console.log('Available Threads:', originalThreads.map(t => ({id: t.id, title: t.title})));
+    console.log('Thread loading:', originalThreadsLoading);
     console.log('----------------------------------------');
   };
 
   // Log thread info on important state changes
   useEffect(() => {
     logThreadInfo();
-  }, [threadIdFromUrl, activeThread, threads, threadsLoading, selectedThreadId]);
+  }, [threadId, activeThread, originalThreads, originalThreadsLoading, selectedThreadId]);
 
   // Initialize the thread from URL or global state when component mounts
   useEffect(() => {
     // Make sure we have threads loaded
-    if (threads.length === 0 || threadsLoading) {
+    if (originalThreads.length === 0 || originalThreadsLoading) {
       console.log('ChatLayout: Threads not loaded yet, waiting');
       return;
     }
     
     console.log('ChatLayout: Initializing thread selection with priorities:');
-    console.log('1. URL Param:', threadIdFromUrl);
+    console.log('1. URL Param:', threadId);
     console.log('2. Global Context:', selectedThreadId);
     console.log('3. Current Active:', activeThread);
     
     // PRIORITY 1: URL parameter (highest priority)
-    if (threadIdFromUrl) {
-      const threadExists = threads.some(t => t.id === threadIdFromUrl);
+    if (threadId) {
+      const threadExists = originalThreads.some(t => t.id === threadId);
       if (threadExists) {
-        console.log('ChatLayout: Using thread ID from URL:', threadIdFromUrl);
-        setActiveThread(threadIdFromUrl);
+        console.log('ChatLayout: Using thread ID from URL:', threadId);
+        setActiveThread(threadId);
         // Also update global context
-        if (selectedThreadId !== threadIdFromUrl) {
-          setSelectedThreadId(threadIdFromUrl);
+        if (selectedThreadId !== threadId) {
+          setSelectedThreadId(threadId);
         }
         return;
       } else {
-        console.warn('ChatLayout: Thread from URL not found:', threadIdFromUrl);
+        console.warn('ChatLayout: Thread from URL not found:', threadId);
+      }
+    } else if (selectedThreadId) {
+      // SPECIAL CASE: No threadId in URL, but we have a selectedThreadId
+      // This happens when "New Chat" is created but we're on /chat without ID
+      console.log('ChatLayout: No thread ID in URL but we have selected thread:', selectedThreadId);
+      const threadExists = originalThreads.some(t => t.id === selectedThreadId);
+      if (threadExists) {
+        console.log('ChatLayout: Found thread in list, navigating and setting active');
+        setActiveThread(selectedThreadId);
+        // Force navigation to the thread URL
+        navigate(`/chat/${selectedThreadId}`, { replace: true });
+        return;
       }
     }
     
     // PRIORITY 2: Global context state
     if (selectedThreadId) {
-      const threadExists = threads.some(t => t.id === selectedThreadId);
+      const threadExists = originalThreads.some(t => t.id === selectedThreadId);
       if (threadExists) {
         console.log('ChatLayout: Using thread ID from global context:', selectedThreadId);
         setActiveThread(selectedThreadId);
         
         // Update URL if needed
-        if (threadIdFromUrl !== selectedThreadId) {
+        if (threadId !== selectedThreadId) {
           console.log('ChatLayout: Updating URL to match global context:', selectedThreadId);
           navigate(`/chat/${selectedThreadId}`, { replace: true });
         }
@@ -95,12 +123,12 @@ export function ChatLayout() {
     
     // PRIORITY 3: Current active thread state
     if (activeThread) {
-      const threadExists = threads.some(t => t.id === activeThread);
+      const threadExists = originalThreads.some(t => t.id === activeThread);
       if (threadExists) {
         console.log('ChatLayout: Keeping current active thread:', activeThread);
         
         // Update URL and global context if needed
-        if (threadIdFromUrl !== activeThread) {
+        if (threadId !== activeThread) {
           navigate(`/chat/${activeThread}`, { replace: true });
         }
         if (selectedThreadId !== activeThread) {
@@ -111,19 +139,19 @@ export function ChatLayout() {
     }
     
     // PRIORITY 4: Default to first thread if nothing else is selected
-    if (threads.length > 0) {
-      const firstThreadId = threads[0].id;
+    if (originalThreads.length > 0) {
+      const firstThreadId = originalThreads[0].id;
       console.log('ChatLayout: Nothing selected, defaulting to first thread:', firstThreadId);
       setActiveThread(firstThreadId);
       setSelectedThreadId(firstThreadId);
       navigate(`/chat/${firstThreadId}`, { replace: true });
     }
-  }, [threads, threadsLoading, threadIdFromUrl, selectedThreadId, activeThread, navigate]);
+  }, [originalThreads, originalThreadsLoading, threadId, selectedThreadId, activeThread, navigate]);
 
   // Change active thread when a new thread is selected
   const handleSetActiveThread = (threadId: string) => {
     console.log('ChatLayout: handleSetActiveThread called with thread ID:', threadId);
-    if (threadId && threads.some(t => t.id === threadId)) {
+    if (threadId && originalThreads.some(t => t.id === threadId)) {
       setActiveThread(threadId);
       setSelectedThreadId(threadId);
     } else {
@@ -147,28 +175,28 @@ export function ChatLayout() {
 
   // Add a safety timeout to prevent getting stuck in loading state
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
-    
-    if (threadsLoading && !loadingTimeout) {
-      console.log('ChatLayout: Setting threads loading safety timeout (8 seconds)');
-      timeoutId = setTimeout(() => {
+    if (originalThreadsLoading && !loadingTimeout && !timeoutIdRef.current) {
+      console.log('ChatLayout: Setting threads loading safety timeout (20 seconds)');
+      timeoutIdRef.current = setTimeout(() => {
         console.log('ChatLayout: Threads loading safety timeout triggered');
         setLoadingTimeout(true);
         toast({
-          title: "Loading taking longer than expected",
-          description: "We're having trouble loading your conversations. The database might be slow to respond.",
-          variant: "destructive",
+          title: "Taking longer than expected",
+          description: "We're having trouble loading your conversations. We'll keep trying in the background.",
+          variant: "warning",
         });
-      }, 8000); // Increased from 5000 to 8000ms (8 seconds)
+        timeoutIdRef.current = null;
+      }, 20000); // 20 seconds
     }
     
     return () => {
-      if (timeoutId) {
+      if (timeoutIdRef.current) {
         console.log('ChatLayout: Clearing threads loading safety timeout');
-        clearTimeout(timeoutId);
+        clearTimeout(timeoutIdRef.current);
+        timeoutIdRef.current = null;
       }
     };
-  }, [threadsLoading, loadingTimeout, toast]);
+  }, [originalThreadsLoading, loadingTimeout, toast]);
 
   // Create a callback for updating thread titles
   const handleThreadTitleGenerated = async (title: string) => {
@@ -183,42 +211,62 @@ export function ChatLayout() {
     undefined, // onFirstMessage callback (not needed here)
     handleThreadTitleGenerated // Pass the title update callback
   );
-  const messages = messagesResult?.messages || [];
+  const threadMessages = messagesResult?.messages || [];
   const messagesLoading = messagesResult?.loading || false;
   const isGenerating = messagesResult?.isGenerating || false;
   const showPaywall = messagesResult?.showPaywall || false;
   const handleClosePaywall = messagesResult?.handleClosePaywall;
   const messageCount = messagesResult?.messageCount || 0;
   const messageLimit = messagesResult?.messageLimit || 0;
+  const preservedMessage = messagesResult?.preservedMessage;
+
+  // Handle paywall related logic and toast dismissal
+  useEffect(() => {
+    // When paywall appears, we should dismiss any toasts
+    if (showPaywall) {
+      // Dismiss any active toasts to prevent them from appearing alongside the paywall
+      dismiss();
+      
+      // Also set a small timeout to make sure all toasts are cleared
+      const timeoutId = setTimeout(() => {
+        dismiss();
+      }, 100);
+      
+      return () => {
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [showPaywall, dismiss]);
 
   // Add a safety timeout for messages loading
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
-    
-    if (messagesLoading && !messagesLoadingTimeout && activeThread) {
-      console.log('ChatLayout: Setting messages loading safety timeout (8 seconds)');
-      timeoutId = setTimeout(() => {
+    // Set timeout when messages are loading
+    if (messagesLoading && !messagesTimeoutIdRef.current) {
+      console.log('ChatLayout: Setting messages loading safety timeout (15 seconds)');
+      messagesTimeoutIdRef.current = setTimeout(() => {
         console.log('ChatLayout: Messages loading safety timeout triggered');
-        setMessagesLoadingTimeout(true);
         toast({
           title: "Loading messages taking longer than expected",
           description: "We're having trouble loading your messages. The database might be slow to respond.",
-          variant: "destructive",
+          variant: "warning",
         });
-      }, 8000); // 8 second timeout (increased from 5 seconds)
+      }, 15000); // 15 seconds
+    } 
+    // Clear timeout when messages are no longer loading
+    else if (!messagesLoading && messagesTimeoutIdRef.current) {
+      console.log('ChatLayout: Clearing messages loading safety timeout');
+      clearTimeout(messagesTimeoutIdRef.current);
+      messagesTimeoutIdRef.current = null;
     }
     
-    if (!messagesLoading) {
-      setMessagesLoadingTimeout(false);
-    }
-    
+    // Cleanup on unmount
     return () => {
-      if (timeoutId) {
-        console.log('ChatLayout: Clearing messages loading safety timeout');
-        clearTimeout(timeoutId);
+      if (messagesTimeoutIdRef.current) {
+        clearTimeout(messagesTimeoutIdRef.current);
+        messagesTimeoutIdRef.current = null;
       }
     };
-  }, [messagesLoading, messagesLoadingTimeout, activeThread, toast]);
+  }, [messagesLoading, toast]);
 
   // Set active thread to most recent thread on initial load
   // or create a default thread for new users
@@ -227,19 +275,19 @@ export function ChatLayout() {
     let isMounted = true;
     
     console.log('ChatLayout: Thread state update', { 
-      threadsCount: threads.length, 
+      threadsCount: originalThreads.length, 
       threadsLoading, 
       activeThread,
       hasUser: !!user
     });
     
     // Only proceed if we're done loading or if the loading has timed out
-    if ((!threadsLoading || loadingTimeout) && isMounted) {
-      if (threads.length > 0) {
+    if ((!originalThreadsLoading || loadingTimeout) && isMounted) {
+      if (originalThreads.length > 0) {
         // If user has threads, set the most recent one as active
         if (!activeThread && isMounted) {
-          console.log('ChatLayout: Setting active thread to most recent', threads[0].id);
-          setActiveThread(threads[0].id);
+          console.log('ChatLayout: Setting active thread to most recent', originalThreads[0].id);
+          setActiveThread(originalThreads[0].id);
         }
       } else if (user) {
         // If user has no threads, create a default thread
@@ -315,7 +363,7 @@ export function ChatLayout() {
       isMounted = false;
       sessionStorage.removeItem('attemptingThreadCreation');
     };
-  }, [threads, activeThread, threadsLoading, loadingTimeout, user, createThread, toast]);
+  }, [originalThreads, activeThread, originalThreadsLoading, loadingTimeout, user, createThread, toast]);
 
   const handleNewChat = async () => {
     try {
@@ -330,6 +378,13 @@ export function ChatLayout() {
         variant: "default",
       });
       
+      // Log threads before creation
+      console.log('Threads BEFORE creation:', originalThreads.map(t => ({
+        id: t.id,
+        title: t.title,
+        created_at: t.created_at
+      })));
+      
       // Set a timeout for thread creation
       const threadPromise = createThread();
       const timeoutPromise = new Promise((_, reject) => {
@@ -340,8 +395,22 @@ export function ChatLayout() {
       const thread = await Promise.race([threadPromise, timeoutPromise]);
       
       if (thread) {
-        console.log('ChatLayout: New thread created successfully', thread.id);
+        console.log('ChatLayout: New thread created successfully', thread.id, thread);
+        
+        // FORCE immediate refetch of threads to ensure we have the latest order
+        await refetchThreads();
+        
+        console.log('ChatLayout: Threads refreshed, now preparing navigation');
+        
+        // Set the newly created thread as the active thread FIRST
         setActiveThread(thread.id);
+        setSelectedThreadId(thread.id);
+        console.log('ChatLayout: Set activeThread and selectedThreadId to:', thread.id);
+        
+        // Force direct navigation to the new thread with replace to avoid history stack issues
+        console.log('ChatLayout: Navigating to new thread:', thread.id);
+        navigate(`/chat/${thread.id}`, { replace: true });
+        
         toast({
           title: "Conversation created",
           description: "You can now start chatting.",
@@ -381,15 +450,40 @@ export function ChatLayout() {
 
   const handleDeleteThread = async (threadId: string) => {
     try {
-      // Modify the useThreads hook to expose a function for optimistic updates
+      // Set thread deletion flag to prevent showing full loading spinner
+      setIsThreadDeletion(true);
+      
+      // Get the thread title before deletion for the toast
+      const threadToDelete = originalThreads.find(t => t.id === threadId);
+      const threadTitle = threadToDelete?.title || 'Conversation';
+      
+      // Delete the thread (this has optimistic updates)
       const success = await deleteThread(threadId);
       
-      if (!success) {
-        // If deletion fails, we could implement additional error handling here
+      if (success) {
+        // Show a toast confirming deletion
+        toast({
+          title: "Thread deleted",
+          description: `"${threadTitle}" has been removed.`,
+          variant: "default",
+        });
+      } else {
         console.error('Thread deletion failed on the server');
       }
+      
+      // Navigation is now handled by the Sidebar component
     } catch (error) {
       console.error('Failed to delete thread:', error);
+      
+      // Show error toast
+      toast({
+        title: "Error deleting thread",
+        description: "There was a problem deleting the conversation.",
+        variant: "destructive",
+      });
+    } finally {
+      // Reset thread deletion flag
+      setIsThreadDeletion(false);
     }
   };
 
@@ -405,7 +499,21 @@ export function ChatLayout() {
     window.location.reload();
   };
 
-  if (threadsLoading && !loadingTimeout) {
+  // Check for mobile screen size
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    
+    // Set initial value
+    checkMobile();
+    
+    // Add event listener for resize
+    window.addEventListener('resize', checkMobile);
+    
+    // Clean up
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  if (originalThreadsLoading && !loadingTimeout && !isThreadDeletion) {
     console.log('ChatLayout: Showing loading spinner for threads');
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -424,9 +532,9 @@ export function ChatLayout() {
   }
 
   console.log('ChatLayout: Rendering main interface', { 
-    threadsCount: threads.length, 
+    threadsCount: originalThreads.length, 
     activeThread, 
-    messagesCount: messages.length 
+    messagesCount: threadMessages.length 
   });
 
   return (
@@ -439,7 +547,7 @@ export function ChatLayout() {
         onSignOut={handleSignOut}
         onDeleteThread={handleDeleteThread}
         onRenameThread={handleRenameThread}
-        sessions={threads.map(thread => ({
+        sessions={originalThreads.map(thread => ({
           id: thread.id,
           title: thread.title,
           created_at: thread.created_at
@@ -448,12 +556,14 @@ export function ChatLayout() {
       />
       
       <main 
-        className={`flex-1 h-screen transition-all duration-300 ${
-          isExpanded ? 'ml-[var(--sidebar-width)]' : 'ml-[var(--sidebar-collapsed-width)]'
-        }`}
+        className="flex-1 h-screen overflow-hidden w-full"
+        style={{ 
+          marginLeft: isExpanded ? 'var(--sidebar-width)' : 'var(--sidebar-collapsed-width)',
+          width: `calc(100% - ${isExpanded ? 'var(--sidebar-width)' : 'var(--sidebar-collapsed-width)'})`
+        }}
       >
-        <div className="h-full relative">
-          {threadsLoading && !loadingTimeout ? (
+        <div className="h-full relative w-full">
+          {originalThreadsLoading && !loadingTimeout ? (
             <div className="flex flex-col items-center justify-center h-full">
               <LoadingSpinner size="lg" />
               <p className="mt-4 text-sm text-gray-500">Loading conversations...</p>
@@ -480,18 +590,22 @@ export function ChatLayout() {
               {activeThread ? (
                 <ChatInterface
                   threadId={activeThread}
-                  messages={messages}
+                  messages={threadMessages}
                   loading={messagesLoading}
-                  loadingTimeout={messagesLoadingTimeout}
+                  loadingTimeout={messagesTimeoutIdRef.current !== null && messagesLoading}
                   onSend={messagesResult?.sendMessage}
                   onRefresh={handleRefresh}
+                  messageCount={messageCount}
+                  messageLimit={messageLimit}
+                  preservedMessage={preservedMessage}
+                  showPaywall={showPaywall}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full">
                   <div className="text-center max-w-md mx-auto p-6">
                     <h3 className="text-xl font-semibold mb-2">No conversation selected</h3>
                     <p className="mb-4 text-gray-600">
-                      {threads.length === 0 ? 
+                      {originalThreads.length === 0 ? 
                         "We couldn't load any conversations. The database might be responding slowly." : 
                         "Select a conversation from the sidebar or create a new one to get started."}
                     </p>
@@ -513,7 +627,9 @@ export function ChatLayout() {
                 </div>
               )}
               {showPaywall && (
-                <Paywall onCancel={handleClosePaywall} />
+                <div className="absolute inset-0">
+                  <Paywall onCancel={handleClosePaywall} preservedMessage={preservedMessage} />
+                </div>
               )}
             </>
           )}

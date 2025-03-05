@@ -5,6 +5,18 @@ import type { ToastActionElement, ToastProps } from '@/components/ui/toast';
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000;
 
+// Global flag to prevent toasts during paywall
+let paywallActive = false;
+
+// Function to set paywall state
+export function setPaywallActive(active: boolean) {
+  paywallActive = active;
+  // If setting to active, dismiss all existing toasts
+  if (active) {
+    dispatch({ type: 'DISMISS_TOAST' });
+  }
+}
+
 export const ACTION_TYPES = {
   ADD_TOAST: 'ADD_TOAST',
   UPDATE_TOAST: 'UPDATE_TOAST',
@@ -136,6 +148,15 @@ function dispatch(action: Action) {
 }
 
 function toast(props: Omit<ToasterToast, 'id'>) {
+  // If paywall is active, don't create the toast
+  if (paywallActive) {
+    return {
+      id: 'blocked-by-paywall',
+      dismiss: () => {},
+      update: () => {},
+    };
+  }
+
   const id = crypto.randomUUID();
 
   const update = (props: ToasterToast) =>

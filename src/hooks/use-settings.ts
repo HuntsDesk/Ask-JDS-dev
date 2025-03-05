@@ -4,8 +4,8 @@ import type { AISettings } from '@/types/ai';
 
 const DEFAULT_SETTINGS: AISettings = {
   id: 'default',
-  model: 'gpt-4o',
-  provider: 'openai',
+  model: 'gemini-1.5-pro',
+  provider: 'google',
   is_active: true,
   created_at: new Date().toISOString(),
   created_by: null
