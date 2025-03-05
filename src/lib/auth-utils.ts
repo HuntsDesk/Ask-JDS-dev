@@ -1,5 +1,7 @@
 // Auth utility functions that can be imported by other modules
 
+import { supabase } from './supabase';
+
 /**
  * Add a timeout to any promise with retry capability and improved error handling
  */
@@ -106,5 +108,57 @@ export async function fetchWithRetry(
     console.log(`Retrying fetch to ${url}, ${retries} retries left`);
     await new Promise(resolve => setTimeout(resolve, backoff));
     return fetchWithRetry(url, options, retries - 1, backoff * 2);
+  }
+}
+
+/**
+ * Ensures a user record exists in the profiles table
+ */
+export async function ensureUserRecord(userId: string, userEmail: string): Promise<boolean> {
+  try {
+    console.log(`Ensuring profile record exists for user ${userId}`);
+    
+    // First check if the user already exists
+    const { data: existingProfile, error: checkError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+    
+    // If there was an error that's not "record not found", log it
+    if (checkError && !checkError.message.includes('not found') && checkError.code !== 'PGRST116') {
+      console.error('Error checking for profile existence:', checkError);
+      return false;
+    }
+    
+    // If the profile already exists, no need to create one
+    if (existingProfile) {
+      console.log(`Profile record already exists for user ${userId}`);
+      return true;
+    }
+    
+    // If profile doesn't exist, create it
+    console.log(`Creating new profile record for user ${userId}`);
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        first_name: '',
+        last_name: '',
+        lifetime_message_count: 0
+      });
+    
+    if (insertError) {
+      console.error('Error creating profile record:', insertError);
+      return false;
+    }
+    
+    console.log(`Successfully created profile record for user ${userId}`);
+    return true;
+  } catch (error) {
+    console.error('Exception in ensureUserRecord:', error);
+    return false;
   }
 } 

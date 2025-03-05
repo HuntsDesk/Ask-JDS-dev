@@ -24,6 +24,7 @@ export function ChatLayout() {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isThreadDeletion, setIsThreadDeletion] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   
   const navigate = useNavigate();
   const params = useParams<{ threadId?: string }>();
@@ -513,6 +514,18 @@ export function ChatLayout() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Add an effect to delay showing "No conversation selected" message
+  useEffect(() => {
+    if (!originalThreadsLoading && !messagesLoading) {
+      // Delay setting initialLoadComplete to prevent flash of "No conversation selected"
+      const timer = setTimeout(() => {
+        setInitialLoadComplete(true);
+      }, 300); // Small delay to allow thread selection to complete
+      
+      return () => clearTimeout(timer);
+    }
+  }, [originalThreadsLoading, messagesLoading]);
+
   if (originalThreadsLoading && !loadingTimeout && !isThreadDeletion) {
     console.log('ChatLayout: Showing loading spinner for threads');
     return (
@@ -563,7 +576,7 @@ export function ChatLayout() {
         }}
       >
         <div className="h-full relative w-full">
-          {originalThreadsLoading && !loadingTimeout ? (
+          {(originalThreadsLoading || !initialLoadComplete) && !loadingTimeout ? (
             <div className="flex flex-col items-center justify-center h-full">
               <LoadingSpinner size="lg" />
               <p className="mt-4 text-sm text-gray-500">Loading conversations...</p>
@@ -600,7 +613,7 @@ export function ChatLayout() {
                   preservedMessage={preservedMessage}
                   showPaywall={showPaywall}
                 />
-              ) : (
+              ) : initialLoadComplete && (
                 <div className="flex flex-col items-center justify-center h-full">
                   <div className="text-center max-w-md mx-auto p-6">
                     <h3 className="text-xl font-semibold mb-2">No conversation selected</h3>

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from './supabase';
 import type { AuthContextType, User } from '@/types';
-import { withTimeout } from './auth-utils';
+import { withTimeout, ensureUserRecord } from './auth-utils';
 
 // Create a global key for the auth instance
 const GLOBAL_AUTH_KEY = '__AUTH_INSTANCE__';
@@ -241,7 +241,9 @@ async function ensureSupabaseClientReady(): Promise<void> {
  */
 async function refreshUserData(user: User): Promise<void> {
   console.log('Refreshing user data for:', user.email);
-  // Add additional data fetching here if needed
+  
+  // Ensure the user has a record in the public.users table
+  await ensureUserRecord(user.id, user.email);
 }
 
 function AuthProviderComponent({ children }: { children: React.ReactNode }) {
@@ -453,6 +455,40 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
         setGlobalAuthInstance(authInstance);
         
         return { error: err instanceof Error ? err : new Error(String(err)) };
+      }
+    },
+    refreshUser: async () => {
+      if (!user) return;
+      
+      try {
+        // Get updated user data from Supabase
+        const { data: { user: authUser }, error } = await supabase.auth.getUser();
+        
+        if (error || !authUser) {
+          console.error('Error refreshing user:', error);
+          return;
+        }
+        
+        // Create user object with isAdmin always set to false in the user app
+        const updatedUser = {
+          id: authUser.id,
+          email: authUser.email!,
+          isAdmin: false,
+          last_sign_in_at: authUser.last_sign_in_at,
+          user_metadata: authUser.user_metadata
+        };
+        
+        // Update state
+        setUser(updatedUser);
+        
+        // Update singleton instance
+        authInstance.user = updatedUser;
+        setGlobalAuthInstance(authInstance);
+        
+        // Refresh additional user data
+        refreshUserData(updatedUser);
+      } catch (err) {
+        console.error('Error refreshing user:', err);
       }
     }
   };

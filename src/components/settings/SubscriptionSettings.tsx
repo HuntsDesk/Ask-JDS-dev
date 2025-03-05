@@ -14,7 +14,7 @@ import { formatDate } from '@/lib/utils';
 
 // Constants
 const FREE_TIER_LIMIT = FREE_MESSAGE_LIMIT;
-const SUBSCRIPTION_PRICE = '$9.99';
+const SUBSCRIPTION_PRICE = '$5';
 
 export function SubscriptionSettings() {
   const [isLoading, setIsLoading] = useState(true);
@@ -245,7 +245,7 @@ export function SubscriptionSettings() {
           <Button 
             onClick={handleSubscribe} 
             disabled={isActionLoading}
-            className="w-full"
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white"
           >
             {isActionLoading ? (
               <>

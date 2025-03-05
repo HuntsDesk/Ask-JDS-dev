@@ -29,6 +29,9 @@ const CACHE_TTL = 60 * 1000; // 1 minute
 // Cache for subscription data
 let cachedSubscription: Subscription | null = null;
 
+// Cache for lifetime message counts
+const lifetimeMessageCountCache = new Map<string, { count: number, timestamp: number }>();
+
 // Flag to track if we've already logged database errors
 let hasLoggedDatabaseErrors = false;
 
@@ -214,6 +217,27 @@ export async function incrementUserMessageCount(userId?: string): Promise<number
     }
     
     console.log(`Incrementing message count for user: ${userId}`);
+    
+    // Also increment the lifetime message count
+    try {
+      const { data: lifetimeCount, error: lifetimeError } = await supabase.rpc('increment_lifetime_message_count', { user_id: userId });
+      
+      if (lifetimeError) {
+        console.error(`Error incrementing lifetime message count: ${lifetimeError.message}`, lifetimeError);
+        handleDatabaseError(lifetimeError, 'incrementLifetimeMessageCount');
+      } else {
+        console.log(`Incremented lifetime message count to: ${lifetimeCount}`);
+        
+        // Update lifetime count cache
+        lifetimeMessageCountCache.set(userId, {
+          count: lifetimeCount || 0,
+          timestamp: Date.now()
+        });
+      }
+    } catch (lifetimeErr) {
+      console.error(`Exception incrementing lifetime message count: ${lifetimeErr}`);
+      handleDatabaseError(lifetimeErr, 'incrementLifetimeMessageCount');
+    }
     
     // Try to use the RPC function first (more efficient and handles race conditions)
     try {
@@ -633,6 +657,133 @@ export async function createCustomerPortalSession(userId?: string): Promise<stri
     }
   } catch (err) {
     console.error('Failed to create customer portal session:', err);
+    return null;
+  }
+}
+
+/**
+ * Gets the lifetime message count for a user
+ */
+export async function getLifetimeMessageCount(userId?: string): Promise<number> {
+  try {
+    // If no userId provided, get the current user
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
+      
+      if (!userId) {
+        console.warn('No user ID available for getting lifetime message count');
+        return 0;
+      }
+    }
+    
+    // Check cache first
+    const cached = lifetimeMessageCountCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.count;
+    }
+    
+    // Try to use the RPC function first (more efficient)
+    try {
+      const { data: count, error: rpcError } = await supabase.rpc('get_lifetime_message_count', { user_id: userId });
+      
+      if (!rpcError && typeof count === 'number') {
+        // Cache the result
+        lifetimeMessageCountCache.set(userId, {
+          count,
+          timestamp: Date.now()
+        });
+        
+        return count;
+      }
+      
+      if (rpcError) {
+        handleDatabaseError(rpcError, 'getLifetimeMessageCount (RPC)');
+      }
+    } catch (rpcErr) {
+      handleDatabaseError(rpcErr, 'getLifetimeMessageCount (RPC)');
+    }
+    
+    // Fallback: Get count directly from profiles table
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('lifetime_message_count')
+        .eq('id', userId)
+        .single();
+      
+      if (profileError) {
+        handleDatabaseError(profileError, 'getLifetimeMessageCount (profiles)');
+        return 0;
+      }
+      
+      const count = profileData.lifetime_message_count || 0;
+      
+      // Cache the result
+      lifetimeMessageCountCache.set(userId, {
+        count,
+        timestamp: Date.now()
+      });
+      
+      return count;
+    } catch (countErr) {
+      handleDatabaseError(countErr, 'getLifetimeMessageCount (profiles)');
+    }
+    
+    return 0;
+  } catch (err) {
+    console.error('Failed to get lifetime message count:', err);
+    return 0;
+  }
+}
+
+/**
+ * Get the user's sign up date
+ */
+export async function getUserSignUpDate(userId?: string): Promise<Date | null> {
+  try {
+    // If no userId provided, get the current user
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
+      
+      if (!userId) {
+        console.warn('No user ID available for getting sign up date');
+        return null;
+      }
+    }
+    
+    // Query the users table for created_at
+    const { data, error } = await supabase
+      .from('users')
+      .select('created_at')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching user sign up date:', error);
+      return null;
+    }
+    
+    if (data?.created_at) {
+      return new Date(data.created_at);
+    }
+    
+    // Fallback to auth.users if not found in public.users
+    const { data: authData, error: authError } = await supabase.auth.admin.getUserById(userId);
+    
+    if (authError || !authData?.user) {
+      console.error('Error fetching user from auth:', authError);
+      return null;
+    }
+    
+    if (authData.user.created_at) {
+      return new Date(authData.user.created_at);
+    }
+    
+    return null;
+  } catch (err) {
+    console.error('Failed to get user sign up date:', err);
     return null;
   }
 } 

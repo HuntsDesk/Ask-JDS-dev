@@ -12,6 +12,8 @@ import { Sidebar } from '@/components/chat/Sidebar';
 import { cn } from '@/lib/utils';
 import { useThreads } from '@/hooks/use-threads';
 import { SelectedThreadContext, SidebarContext } from '@/App';
+import { UserProfileForm } from './UserProfileForm';
+import { UserProfileInfo } from './UserProfileInfo';
 
 export function SettingsPage() {
   const { user, loading, signOut } = useAuth();
@@ -150,25 +152,25 @@ export function SettingsPage() {
             <TabsContent value="account" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Account Settings</CardTitle>
+                  <CardTitle>Profile Information</CardTitle>
                   <CardDescription>
-                    Manage your account information
+                    Update your personal information
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    <div>
-                      <span className="font-semibold">Email:</span> {user.email}
-                    </div>
-                    {user.user_metadata && 'full_name' in user.user_metadata && (
-                      <div>
-                        <span className="font-semibold">Name:</span> {(user.user_metadata as any).full_name}
-                      </div>
-                    )}
-                    <div>
-                      <span className="font-semibold">User ID:</span> {user.id}
-                    </div>
-                  </div>
+                  <UserProfileForm />
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Statistics</CardTitle>
+                  <CardDescription>
+                    View your usage statistics
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <UserProfileInfo />
                 </CardContent>
               </Card>
             </TabsContent>

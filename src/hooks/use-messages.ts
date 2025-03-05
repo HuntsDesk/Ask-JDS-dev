@@ -12,6 +12,7 @@ import {
   incrementUserMessageCount, 
   hasReachedFreeMessageLimit,
   getUserMessageCount,
+  getLifetimeMessageCount,
   FREE_MESSAGE_LIMIT,
   hasActiveSubscription
 } from '@/lib/subscription';
@@ -24,6 +25,7 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
+  const [lifetimeMessageCount, setLifetimeMessageCount] = useState(0);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [preservedMessage, setPreservedMessage] = useState<string | undefined>(undefined);
   const { toast, dismiss } = useToast();
@@ -46,12 +48,14 @@ export function useMessages(threadId: string | null, onFirstMessage?: (message: 
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const [count, subscribed] = await Promise.all([
+        const [count, lifetimeCount, subscribed] = await Promise.all([
           getUserMessageCount(),
+          getLifetimeMessageCount(),
           hasActiveSubscription()
         ]);
         
         setMessageCount(count);
+        setLifetimeMessageCount(lifetimeCount);
         setIsSubscribed(subscribed);
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -434,8 +438,12 @@ Respond with ONLY the title, no quotes or additional text.`;
       }
 
       // Increment user message count in database and update local state
-      const newCount = await incrementUserMessageCount();
+      const [newCount, newLifetimeCount] = await Promise.all([
+        incrementUserMessageCount(),
+        getLifetimeMessageCount()
+      ]);
       setMessageCount(newCount);
+      setLifetimeMessageCount(newLifetimeCount);
       
       // Increment local thread message counter
       userMessageCountRef.current++;
@@ -531,12 +539,14 @@ Respond with ONLY the title, no quotes or additional text.`;
   return {
     messages,
     loading,
+    loadingTimeout: toastTimeoutRef.current,
     isGenerating,
-    loadMessages,
     sendMessage,
+    refreshMessages: loadMessages,
     showPaywall,
     handleClosePaywall,
     messageCount,
+    lifetimeMessageCount,
     messageLimit: FREE_MESSAGE_LIMIT,
     isSubscribed,
     preservedMessage
