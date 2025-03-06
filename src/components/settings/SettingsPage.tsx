@@ -3,7 +3,7 @@ import { SubscriptionSettings } from './SubscriptionSettings';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Monitor, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -14,6 +14,9 @@ import { useThreads } from '@/hooks/use-threads';
 import { SelectedThreadContext, SidebarContext } from '@/App';
 import { UserProfileForm } from './UserProfileForm';
 import { UserProfileInfo } from './UserProfileInfo';
+import { useTheme } from '@/lib/theme-provider';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 export function SettingsPage() {
   const { user, loading, signOut } = useAuth();
@@ -26,6 +29,7 @@ export function SettingsPage() {
   const { threads, loading: threadsLoading, deleteThread, updateThread } = useThreads();
   const { setSelectedThreadId } = useContext(SelectedThreadContext);
   const { isExpanded, setIsExpanded } = useContext(SidebarContext);
+  const { theme, setTheme } = useTheme();
 
   // Sidebar functions
   const handleNewChat = () => {
@@ -133,6 +137,7 @@ export function SettingsPage() {
             <TabsList>
               <TabsTrigger value="subscription">Subscription</TabsTrigger>
               <TabsTrigger value="account">Account</TabsTrigger>
+              <TabsTrigger value="appearance">Appearance</TabsTrigger>
             </TabsList>
             
             <TabsContent value="subscription" className="space-y-4">
@@ -171,6 +176,56 @@ export function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                   <UserProfileInfo />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="appearance" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Theme Settings</CardTitle>
+                  <CardDescription>
+                    Customize the application appearance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-medium mb-3">Color Theme</h3>
+                      <RadioGroup 
+                        value={theme} 
+                        onValueChange={(value) => setTheme(value as 'light' | 'dark' | 'system')}
+                        className="flex flex-col space-y-3"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <RadioGroupItem value="light" id="light" />
+                          <Label htmlFor="light" className="flex items-center space-x-2 cursor-pointer">
+                            <Sun className="h-5 w-5" />
+                            <span>Light</span>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <RadioGroupItem value="dark" id="dark" />
+                          <Label htmlFor="dark" className="flex items-center space-x-2 cursor-pointer">
+                            <Moon className="h-5 w-5" />
+                            <span>Dark</span>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <RadioGroupItem value="system" id="system" />
+                          <Label htmlFor="system" className="flex items-center space-x-2 cursor-pointer">
+                            <Monitor className="h-5 w-5" />
+                            <span>System</span>
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        System theme will automatically switch between light and dark themes based on your system preferences.
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

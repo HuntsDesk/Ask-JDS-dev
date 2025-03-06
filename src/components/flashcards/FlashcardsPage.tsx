@@ -34,7 +34,7 @@ export default function FlashcardsPage() {
   const [loading, setLoading] = useState(true);
   
   // Use the threads hook to fetch actual threads
-  const { threads, loading: threadsLoading, deleteThread, updateThread } = useThreads();
+  const { threads, loading: threadsLoading, deleteThread, updateThread, createThread } = useThreads();
   const { setSelectedThreadId } = useContext(SelectedThreadContext);
   const { isExpanded, setIsExpanded } = useContext(SidebarContext);
   
@@ -64,7 +64,24 @@ export default function FlashcardsPage() {
   
   // Mock functions for sidebar - they don't need full implementation for flashcards page
   const handleNewChat = () => {
-    navigate('/chat');
+    // Instead of just navigating to chat, first create a new thread
+    createThread()
+      .then(thread => {
+        if (thread) {
+          console.log('FlashcardsPage: Created new thread', thread.id);
+          // Set the selected thread ID in the context first
+          setSelectedThreadId(thread.id);
+          // Then navigate to the new thread
+          navigate(`/chat/${thread.id}`);
+        } else {
+          console.error('FlashcardsPage: Failed to create new thread');
+          navigate('/chat'); // Fallback to chat home if creation fails
+        }
+      })
+      .catch(error => {
+        console.error('FlashcardsPage: Error creating new thread:', error);
+        navigate('/chat'); // Fallback to chat home if error occurs
+      });
   };
   
   const handleSignOut = async () => {
@@ -99,15 +116,15 @@ export default function FlashcardsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-screen dark:bg-gray-900">
         <LoadingSpinner size="lg" />
-        <p className="ml-2">Checking access...</p>
+        <p className="ml-2 dark:text-gray-300">Checking access...</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen flex">
+    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen flex">
       {/* Chat Sidebar */}
       <Sidebar
         setActiveTab={handleThreadSelect}
@@ -129,15 +146,15 @@ export default function FlashcardsPage() {
         )}
       >
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8 dark:text-gray-200">
           {!hasSubscription ? (
             // Show the upsell page if user doesn't have a subscription
             <Home />
           ) : (
             // Show flashcard functionality if user has subscription
             <Routes>
-              {/* Redirect from root directly to collections */}
-              <Route path="/" element={<Navigate to="/flashcards/collections" replace />} />
+              {/* Redirect from root directly to subjects */}
+              <Route path="/" element={<Navigate to="/flashcards/subjects" replace />} />
               <Route path="/collections" element={<FlashcardCollections />} />
               <Route path="/study/:id" element={<StudyMode />} />
               <Route path="/subjects/:id" element={<SubjectStudy />} />
@@ -153,7 +170,7 @@ export default function FlashcardsPage() {
               <Route path="/manage-cards/:id" element={<ManageCards />} />
               <Route path="/add-card/:id" element={<AddCard />} />
               <Route path="/edit-subject/:id" element={<EditSubject />} />
-              <Route path="*" element={<Navigate to="/collections" replace />} />
+              <Route path="*" element={<Navigate to="/subjects" replace />} />
             </Routes>
           )}
         </main>

@@ -28,6 +28,7 @@ import { SelectedThreadContext, SidebarContext } from '@/App';
 import { useContext } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { usePersistedState } from '@/hooks/use-persisted-state';
+import { useTheme } from '@/lib/theme-provider';
 
 interface SidebarProps {
   setActiveTab: (tab: string) => void;
@@ -68,6 +69,7 @@ export function Sidebar({
   const navigate = useNavigate();
   const { selectedThreadId, setSelectedThreadId } = useContext(SelectedThreadContext);
   const { isExpanded, setIsExpanded } = useContext(SidebarContext);
+  const { theme } = useTheme();
 
   // Replace regular state with persisted state
   const [isPinned, setIsPinned] = usePersistedState<boolean>('sidebar-is-pinned', false);
@@ -155,17 +157,26 @@ export function Sidebar({
       const date = new Date(session.created_at);
       let key = '';
       
-      if (isToday(date)) {
+      const isSessionToday = isToday(date);
+      const isSessionYesterday = isYesterday(date);
+      const isSessionThisWeek = isThisWeek(date);
+      
+      // Debug log to check date categorization
+      console.log(`Session "${session.title}" (${date.toLocaleDateString()}): isToday=${isSessionToday}, isYesterday=${isSessionYesterday}, isThisWeek=${isSessionThisWeek}`);
+      
+      if (isSessionToday) {
         key = 'Today';
-      } else if (isYesterday(date)) {
+      } else if (isSessionYesterday) {
         key = 'Yesterday';
-      } else if (isThisWeek(date)) {
+      } else if (isSessionThisWeek) {
+        // This is in the current week, but not today or yesterday
         key = 'This Week';
-      } else if (isThisMonth(date)) {
-        key = 'This Month';
       } else {
+        // Not in the current week, group by month and year
         key = format(date, 'MMMM yyyy');
       }
+      
+      console.log(`→ Grouped under: ${key}`);
       
       if (!grouped[key]) {
         grouped[key] = [];
@@ -194,13 +205,27 @@ export function Sidebar({
     return Object.entries(groupedSessions)
       .sort((a, b) => {
         // Custom sort order for date groups
-        const order = ['Today', 'Yesterday', 'This Week', 'This Month'];
+        const order = ['Today', 'Yesterday', 'This Week'];
         const aIndex = order.indexOf(a[0]);
         const bIndex = order.indexOf(b[0]);
+        
         if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
         if (aIndex !== -1) return -1;
         if (bIndex !== -1) return 1;
-        return 0;
+        
+        // For month entries (format: "Month Year"), sort by date (newest first)
+        // Parse "Month Year" format
+        try {
+          // Use Date.parse with the first day of the month for comparison
+          const aDate = new Date(Date.parse(`1 ${a[0]}`));
+          const bDate = new Date(Date.parse(`1 ${b[0]}`));
+          
+          // Sort in descending order (newest first)
+          return bDate.getTime() - aDate.getTime();
+        } catch (err) {
+          console.error('Error parsing month dates:', err);
+          return 0;
+        }
       });
   }, [groupedSessions]);
 
@@ -276,16 +301,23 @@ export function Sidebar({
           isDesktopExpanded ? "px-4" : "px-2"
         )}>
           {isDesktopExpanded ? (
-            <img 
-              src="/images/JDSimplified_Logo.png" 
-              alt="JD Simplified Logo" 
-              className="h-10 transition-all" 
-            />
+            <>
+              <img 
+                src="/images/JDSimplified_Logo.png" 
+                alt="JD Simplified Logo" 
+                className="h-10 transition-all dark:hidden" 
+              />
+              <img 
+                src="/images/JDSimplified_Logo_wht.png" 
+                alt="JD Simplified Logo" 
+                className="h-10 transition-all hidden dark:block" 
+              />
+            </>
           ) : (
             <img 
               src="/images/JD Simplified Favicon.svg" 
               alt="JDS" 
-              className="h-8 transition-all" 
+              className="h-8 transition-all dark:invert" 
             />
           )}
         </div>
@@ -420,7 +452,7 @@ export function Sidebar({
       </ScrollArea>
 
       <div className="sticky bottom-0 z-30 bg-background p-3 border-t space-y-2">
-        <Link to="/flashcards">
+        <Link to="/flashcards/subjects">
           <Button
             variant={isInFlashcards ? "default" : "ghost"}
             className={cn(

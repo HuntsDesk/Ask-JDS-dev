@@ -29,7 +29,7 @@ export default function Card({
   subjectId
 }: CardProps) {
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
       <div className="p-6">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
@@ -47,11 +47,11 @@ export default function Card({
           </div>
           
           <div className="flex flex-col items-end gap-1 text-sm">
-            <div className="flex items-center gap-1 text-gray-500">
+            <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
               <BookText className="h-4 w-4" />
               <span>{count} cards</span>
             </div>
-            <div className="flex items-center gap-1 text-green-600">
+            <div className="flex items-center gap-1 text-green-600 dark:text-green-500">
               <CheckCircle className="h-4 w-4" />
               <span>{masteredCount} mastered</span>
             </div>
@@ -59,14 +59,14 @@ export default function Card({
         </div>
         
         <Link to={link}>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2 hover:text-[#F37022] transition-colors">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 hover:text-[#F37022] transition-colors">
             {title}
           </h3>
         </Link>
         
         <div className="h-12 mb-4">
           {description ? (
-            <p className="text-gray-600 line-clamp-2">
+            <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
               {description}
             </p>
           ) : (
@@ -80,7 +80,7 @@ export default function Card({
               <Tooltip text="Add Card">
                 <Link
                   to={`/flashcards/add-card/${collectionId}`}
-                  className="text-gray-600 hover:text-[#F37022]"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[#F37022]"
                 >
                   <PlusCircle className="h-5 w-5" />
                 </Link>
@@ -88,7 +88,7 @@ export default function Card({
               <Tooltip text="Edit Collection">
                 <Link
                   to={`/flashcards/edit/${collectionId}`}
-                  className="text-gray-600 hover:text-[#F37022]"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[#F37022]"
                 >
                   <Edit className="h-5 w-5" />
                 </Link>
@@ -97,7 +97,7 @@ export default function Card({
                 <Tooltip text="Delete Collection">
                   <button
                     onClick={onDelete}
-                    className="text-gray-600 hover:text-red-600"
+                    className="text-gray-600 dark:text-gray-400 hover:text-red-600"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>

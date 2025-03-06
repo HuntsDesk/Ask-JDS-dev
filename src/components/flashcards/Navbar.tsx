@@ -43,29 +43,17 @@ export default function Navbar() {
   const createConfig = getCreateConfig();
 
   return (
-    <nav className="bg-white shadow-lg sticky top-0 z-10 w-full">
+    <nav className="bg-white dark:bg-gray-800 shadow-lg dark:shadow-gray-900 sticky top-0 z-10 w-full">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex items-center h-16">
           {/* Left section - Nav links */}
           <div className="flex items-center space-x-6 flex-shrink-0 mr-4">
             <Link 
-              to="/flashcards/collections" 
-              className={`flex items-center space-x-1 ${
-                location.pathname === '/flashcards/collections' || location.pathname.includes('/flashcards/study/')
-                  ? 'text-[#F37022] font-medium' 
-                  : 'text-gray-600 hover:text-[#F37022]'
-              }`}
-            >
-              <Library className="h-5 w-5" />
-              <span>Collections</span>
-            </Link>
-            
-            <Link 
               to="/flashcards/subjects" 
               className={`flex items-center space-x-1 ${
                 location.pathname === '/flashcards/subjects' || location.pathname.includes('/flashcards/subjects/') 
                   ? 'text-[#F37022] font-medium' 
-                  : 'text-gray-600 hover:text-[#F37022]'
+                  : 'text-gray-600 dark:text-gray-300 hover:text-[#F37022]'
               }`}
             >
               <BookOpen className="h-5 w-5" />
@@ -73,11 +61,23 @@ export default function Navbar() {
             </Link>
             
             <Link 
+              to="/flashcards/collections" 
+              className={`flex items-center space-x-1 ${
+                location.pathname === '/flashcards/collections' || location.pathname.includes('/flashcards/study/')
+                  ? 'text-[#F37022] font-medium' 
+                  : 'text-gray-600 dark:text-gray-300 hover:text-[#F37022]'
+              }`}
+            >
+              <Library className="h-5 w-5" />
+              <span>Collections</span>
+            </Link>
+            
+            <Link 
               to="/flashcards/flashcards" 
               className={`flex items-center space-x-1 ${
                 location.pathname === '/flashcards/flashcards' 
                   ? 'text-[#F37022] font-medium' 
-                  : 'text-gray-600 hover:text-[#F37022]'
+                  : 'text-gray-600 dark:text-gray-300 hover:text-[#F37022]'
               }`}
             >
               <FileText className="h-5 w-5" />

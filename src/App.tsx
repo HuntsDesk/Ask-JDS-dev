@@ -23,6 +23,7 @@ import FlashcardsPage from '@/components/flashcards/FlashcardsPage';
 import { AlertTriangle } from 'lucide-react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query-client';
+import { ThemeProvider } from '@/lib/theme-provider';
 
 // Create a context for the selected thread
 export const SelectedThreadContext = createContext<{
@@ -188,34 +189,36 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary
-        fallback={
-          <div className="fixed inset-0 flex items-center justify-center bg-background">
-            <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full text-center">
-              <h2 className="text-xl font-bold mb-4">Application Error</h2>
-              <p className="mb-4">
-                The application encountered an unexpected error. Please try refreshing the page.
-              </p>
-              <Button 
-                onClick={() => window.location.reload()}
-                className="w-full"
-              >
-                Reload Application
-              </Button>
-            </div>
-          </div>
-        }
-      >
+      <ThemeProvider defaultTheme="system" storageKey="ui-theme">
         <AuthProvider>
-          <SelectedThreadProvider>
-            <SidebarProvider>
-              <RouterProvider router={router} />
-              <Toaster />
-              <OfflineIndicator />
-            </SidebarProvider>
-          </SelectedThreadProvider>
+          <ErrorBoundary
+            fallback={
+              <div className="fixed inset-0 flex items-center justify-center bg-background">
+                <div className="bg-card p-6 rounded-lg shadow-lg max-w-md w-full text-center">
+                  <h2 className="text-xl font-bold mb-4">Application Error</h2>
+                  <p className="mb-4">
+                    The application encountered an unexpected error. Please try refreshing the page.
+                  </p>
+                  <Button 
+                    onClick={() => window.location.reload()}
+                    className="w-full"
+                  >
+                    Reload Application
+                  </Button>
+                </div>
+              </div>
+            }
+          >
+            <SelectedThreadProvider>
+              <SidebarProvider>
+                <RouterProvider router={router} />
+                <Toaster />
+                <OfflineIndicator />
+              </SidebarProvider>
+            </SelectedThreadProvider>
+          </ErrorBoundary>
         </AuthProvider>
-      </ErrorBoundary>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

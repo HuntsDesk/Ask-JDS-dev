@@ -153,7 +153,7 @@ export function HomePage() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Top Menu */}
       <nav className="fixed top-0 left-0 right-0 bg-white z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between text-gray-900">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-3">
@@ -167,13 +167,15 @@ export function HomePage() {
           </div>
 
           {/* Navigation Links | Header | Top Menu */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            {/* Theme toggle button - removing as per requirements */}
+
             {user ? (
               <>
                 <Button 
                   variant="ghost" 
                   onClick={() => navigate('/chat')}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-gray-700"
                 >
                   <MessageSquare className="w-5 h-5" />
                   <span>Chat</span>
@@ -181,20 +183,20 @@ export function HomePage() {
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="rounded-full w-10 h-10 p-0">
+                    <Button variant="outline" className="rounded-full w-10 h-10 p-0 ml-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
                       <User className="w-5 h-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>
+                  <DropdownMenuContent align="end" className="bg-white text-gray-900">
+                    <DropdownMenuLabel className="text-gray-700">
                       {user?.email}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <DropdownMenuItem onClick={() => navigate('/settings')} className="text-gray-700">
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Settings</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleSignOut}>
+                    <DropdownMenuItem onClick={handleSignOut} className="text-gray-700">
                       Log out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
