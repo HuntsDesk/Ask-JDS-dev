@@ -203,7 +203,7 @@ export function SubscriptionSettings() {
         <CardDescription>
           {isFreeTier() 
             ? 'You are currently on the free tier' 
-            : 'You have an active subscription'}
+            : 'You have an active Ask JDS Premium subscription'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -212,6 +212,16 @@ export function SubscriptionSettings() {
           <p className="text-sm text-muted-foreground">
             {isFreeTier() ? 'Free Tier' : 'Premium Plan'}
           </p>
+          {!isFreeTier() && (
+            <div className="mt-2 text-sm rounded-md bg-muted p-3">
+              <div className="font-medium mb-1">Your Premium benefits:</div>
+              <ul className="space-y-1 list-disc pl-4">
+                <li>Unlimited chat messaging</li>
+                <li>Access to premium JDS curated flashcards</li>
+                <li>Create unlimited custom flashcards</li>
+              </ul>
+            </div>
+          )}
         </div>
 
         <div>

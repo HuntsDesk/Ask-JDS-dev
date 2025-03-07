@@ -9,6 +9,7 @@ import { hasActiveSubscription } from '@/lib/subscription';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useThreads } from '@/hooks/use-threads';
 import { SelectedThreadContext, SidebarContext } from '@/App';
+import { FlashcardPaywall } from '@/components/FlashcardPaywall';
 
 // Import pages
 import Home from './pages/Home';
@@ -32,35 +33,106 @@ export default function FlashcardsPage() {
   const navigate = useNavigate();
   const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [currentPath, setCurrentPath] = useState<string | null>(null);
   
   // Use the threads hook to fetch actual threads
   const { threads, loading: threadsLoading, deleteThread, updateThread, createThread } = useThreads();
   const { setSelectedThreadId } = useContext(SelectedThreadContext);
   const { isExpanded, setIsExpanded } = useContext(SidebarContext);
   
+  // Remove the forced paywall effect
+  // useEffect(() => {
+  //   console.log("Setting showPaywall to true immediately for testing");
+  //   setShowPaywall(true);
+  // }, []);
+
   useEffect(() => {
     const checkSubscription = async () => {
       if (user) {
         try {
           setLoading(true);
-          // TEMPORARY: Skip subscription check for testing
-          // const hasAccess = await hasActiveSubscription(user.id);
-          const hasAccess = true; // Temporarily force to true for testing
+          console.log("Checking subscription status...")
+          const hasAccess = await hasActiveSubscription(user.id);
+          console.log("Subscription status:", hasAccess);
+          // Use actual subscription status instead of forcing to false
           setHasSubscription(hasAccess);
         } catch (error) {
           console.error("Error checking subscription:", error);
-          setHasSubscription(true); // Temporarily force to true for testing
+          setHasSubscription(false);
         } finally {
           setLoading(false);
         }
       } else {
-        setHasSubscription(true); // Temporarily force to true for testing
+        console.log("No user logged in, setting hasSubscription to false");
+        setHasSubscription(false);
         setLoading(false);
       }
     };
     
     checkSubscription();
   }, [user]);
+
+  // Function to check if a collection is a user collection or premium one
+  const checkAccessToCollection = async (collectionId: string) => {
+    try {
+      console.log("Checking access to collection:", collectionId);
+      
+      // Option to force the paywall to show for testing
+      const forcePaywallTest = false; // Set to true to force paywall for testing
+      
+      if (forcePaywallTest) {
+        console.log("TESTING MODE: Forcing paywall to show");
+        setCurrentPath(window.location.pathname);
+        setShowPaywall(true);
+        return false;
+      }
+      
+      // Original logic below:
+      // Query to check if collection is premium content
+      const { data, error } = await supabase
+        .from('flashcard_collections')
+        .select('is_official')
+        .eq('id', collectionId)
+        .single();
+      
+      if (error) throw error;
+      
+      console.log("Collection is premium:", data.is_official);
+      console.log("User has subscription:", hasSubscription);
+      
+      // If it's a premium collection, user needs subscription
+      if (data.is_official) {
+        if (!hasSubscription) {
+          console.log("Premium content detected, user doesn't have subscription. Showing paywall.");
+          setCurrentPath(window.location.pathname);
+          setShowPaywall(true);
+          return false;
+        } else {
+          console.log("Premium content detected, but user has subscription. Allowing access.");
+        }
+      } else {
+        console.log("Non-premium content. Allowing access.");
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error checking collection access:", error);
+      return true; // Default to allowing access on error
+    }
+  };
+  
+  const handleClosePaywall = () => {
+    setShowPaywall(false);
+    // Navigate back to the previous page or to subjects if no previous path
+    if (currentPath) {
+      // Extract the base path without the ID
+      const basePath = currentPath.split('/').slice(0, -1).join('/');
+      navigate(basePath || '/flashcards/subjects');
+    } else {
+      navigate('/flashcards/subjects');
+    }
+  };
   
   // Mock functions for sidebar - they don't need full implementation for flashcards page
   const handleNewChat = () => {
@@ -147,16 +219,20 @@ export default function FlashcardsPage() {
       >
         <Navbar />
         <main className="container mx-auto px-4 py-8 dark:text-gray-200">
-          {!hasSubscription ? (
-            // Show the upsell page if user doesn't have a subscription
-            <Home />
+          {/* Show paywall if needed */}
+          {showPaywall ? (
+            <FlashcardPaywall onCancel={handleClosePaywall} />
           ) : (
-            // Show flashcard functionality if user has subscription
             <Routes>
               {/* Redirect from root directly to subjects */}
               <Route path="/" element={<Navigate to="/flashcards/subjects" replace />} />
               <Route path="/collections" element={<FlashcardCollections />} />
-              <Route path="/study/:id" element={<StudyMode />} />
+              <Route path="/study/:id" element={
+                <ProtectedResource 
+                  checkAccess={checkAccessToCollection}
+                  component={StudyMode} 
+                />
+              } />
               <Route path="/subjects/:id" element={<SubjectStudy />} />
               <Route path="/subjects" element={<ManageSubjects />} />
               <Route path="/create-collection" element={<CreateSet />} />
@@ -177,4 +253,48 @@ export default function FlashcardsPage() {
       </div>
     </div>
   );
+}
+
+// Component to wrap protected resources that require subscription verification
+function ProtectedResource({ checkAccess, component: Component, ...rest }: any) {
+  const { id } = rest.params || { id: null };
+  const [canAccess, setCanAccess] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    async function verifyAccess() {
+      console.log("ProtectedResource: Verifying access for resource with ID:", id);
+      if (id) {
+        const hasAccess = await checkAccess(id);
+        console.log("ProtectedResource: Access result:", hasAccess);
+        setCanAccess(hasAccess);
+      } else {
+        console.log("ProtectedResource: No ID provided, defaulting to allowed");
+        setCanAccess(true);
+      }
+      setLoading(false);
+    }
+    
+    verifyAccess();
+  }, [id, checkAccess]);
+  
+  console.log("ProtectedResource: Current state - loading:", loading, "canAccess:", canAccess);
+  
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <LoadingSpinner size="lg" />
+        <p className="ml-2">Checking access...</p>
+      </div>
+    );
+  }
+  
+  // If access is not granted, this will trigger the paywall in the parent component
+  if (!canAccess) {
+    console.log("ProtectedResource: Access denied, returning null");
+    return null;
+  }
+  
+  console.log("ProtectedResource: Access granted, rendering component");
+  return <Component {...rest} />;
 } 

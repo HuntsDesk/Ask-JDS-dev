@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Rotate3D as Rotate, BookOpen, Shuffle, Check, Edit, EyeOff, Eye, FileEdit, FolderCog, ChevronLeft, Settings, PlusCircle, FileText } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Rotate3D as Rotate, BookOpen, Shuffle, Check, Edit, EyeOff, Eye, FileEdit, FolderCog, ChevronLeft, Settings, PlusCircle, FileText, Lock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import useFlashcardAuth from '@/hooks/useFlashcardAuth';
 import LoadingSpinner from '../LoadingSpinner';
@@ -8,6 +8,9 @@ import ErrorMessage from '../ErrorMessage';
 import Toast from '../Toast';
 import useToast from '@/hooks/useFlashcardToast';
 import Tooltip from '../Tooltip';
+import { hasActiveSubscription } from '@/lib/subscription';
+import { FlashcardPaywall } from '@/components/FlashcardPaywall';
+import { useAuth } from '@/lib/auth';
 
 interface Flashcard {
   id: string;
@@ -28,7 +31,8 @@ interface FlashcardCollection {
 
 export default function StudyMode() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useFlashcardAuth();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const { toast, showToast, hideToast } = useToast();
   const [collection, setCollection] = useState<FlashcardCollection | null>(null);
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -37,61 +41,70 @@ export default function StudyMode() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMastered, setShowMastered] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [isOfficialContent, setIsOfficialContent] = useState(false);
 
   useEffect(() => {
-    loadFlashcards();
-  }, [id, showMastered]);
-
-  async function loadFlashcards() {
-    if (!id) {
-      setError("Collection ID is missing");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      // Load the collection details with subject information
-      const { data: collectionData, error: collectionError } = await supabase
-        .from('flashcard_collections')
-        .select(`
-          *,
-          subject:subject_id (
-            name,
-            id
-          )
-        `)
-        .eq('id', id)
-        .single();
-
-      if (collectionError) throw collectionError;
-      setCollection(collectionData);
-
-      // Load the flashcards
-      let query = supabase
-        .from('flashcards')
-        .select('*')
-        .eq('collection_id', id)
-        .order('position')
-        .order('created_at');
-      
-      if (!showMastered) {
-        query = query.eq('is_mastered', false);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Check subscription status
+        if (user) {
+          const hasAccess = await hasActiveSubscription(user.id);
+          console.log("StudyMode: User subscription status:", hasAccess);
+          setHasSubscription(hasAccess);
+        } else {
+          console.log("StudyMode: No user logged in, setting hasSubscription to false");
+          setHasSubscription(false);
+        }
+        
+        // Load collection data
+        const { data: collectionData, error: collectionError } = await supabase
+          .from('flashcard_collections')
+          .select(`
+            *,
+            subject:subject_id(id, name)
+          `)
+          .eq('id', id)
+          .single();
+        
+        if (collectionError) throw collectionError;
+        setCollection(collectionData);
+        
+        // Check if this is premium content
+        const isOfficial = collectionData.is_official || false;
+        console.log("StudyMode: Collection is_official:", isOfficial);
+        setIsOfficialContent(isOfficial);
+        
+        // If it's premium content and user doesn't have subscription, show paywall immediately
+        if (isOfficial && !hasSubscription) {
+          console.log("Premium content detected - user has no subscription - showing paywall");
+          setShowPaywall(true);
+          // Still load the cards but they'll be blurred
+        }
+        
+        // Load flashcards
+        const { data: flashcardsData, error: flashcardsError } = await supabase
+          .from('flashcards')
+          .select('*')
+          .eq('collection_id', id)
+          .order('position', { ascending: true });
+        
+        if (flashcardsError) throw flashcardsError;
+        setCards(flashcardsData || []);
+        
+      } catch (err: any) {
+        console.error('Error loading study data:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-      
-      const { data: cardsData, error: cardsError } = await query;
-
-      if (cardsError) throw cardsError;
-      setCards(cardsData || []);
-      setCurrentIndex(0);
-      setShowAnswer(false);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+    };
+    
+    loadData();
+  }, [id, user]);
 
   const shuffleCards = () => {
     const shuffled = [...cards]
@@ -160,6 +173,15 @@ export default function StudyMode() {
     } catch (err) {
       showToast(`Error: ${err.message}`, 'error');
     }
+  };
+
+  const handleShowPaywall = () => {
+    setShowPaywall(true);
+  };
+  
+  const handleClosePaywall = () => {
+    setShowPaywall(false);
+    navigate('/flashcards/collections');
   };
 
   if (loading) {
@@ -232,6 +254,12 @@ export default function StudyMode() {
   }
 
   const currentCard = cards[currentIndex];
+  
+  // Force premium content blurring for testing
+  const forcePremiumTest = true; // Set to true for testing premium blurring
+  const isPremiumBlurred = (isOfficialContent && !hasSubscription) || forcePremiumTest;
+  
+  console.log("StudyMode render - isPremiumBlurred:", isPremiumBlurred, "isOfficialContent:", isOfficialContent, "hasSubscription:", hasSubscription);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -242,6 +270,10 @@ export default function StudyMode() {
           type={toast.type} 
           onClose={hideToast} 
         />
+      )}
+      
+      {showPaywall && (
+        <FlashcardPaywall onCancel={handleClosePaywall} />
       )}
       
       <div className="flex justify-between items-center mb-6">
@@ -305,16 +337,36 @@ export default function StudyMode() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden relative">
+        {isPremiumBlurred && (
+          <div className="absolute top-0 left-0 right-0 bg-orange-500 text-white text-center py-2 z-10 font-bold">
+            PREMIUM CONTENT - SUBSCRIPTION REQUIRED
+          </div>
+        )}
         <div className="p-8">
           <div
             className="min-h-[250px] flex items-center justify-center cursor-pointer"
             onClick={toggleAnswer}
           >
             <div className="text-center w-full">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                {showAnswer ? currentCard.answer : currentCard.question}
-              </h2>
+              {isPremiumBlurred ? (
+                <div className="premium-content-placeholder">
+                  <div className="bg-orange-100 p-6 rounded-lg">
+                    <div className="flex flex-col items-center gap-4">
+                      <Lock className="h-12 w-12 text-orange-500" />
+                      <h2 className="text-2xl font-semibold text-orange-800">Premium Flashcard</h2>
+                      <p className="text-orange-700 max-w-md mx-auto">
+                        This {showAnswer ? "answer" : "question"} is only available to premium subscribers. 
+                        Upgrade your account to access our curated library of expert flashcards.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                  {showAnswer ? currentCard.answer : currentCard.question}
+                </h2>
+              )}
             </div>
           </div>
           
@@ -322,6 +374,7 @@ export default function StudyMode() {
             <button
               className="text-indigo-600 hover:text-indigo-700 flex items-center gap-2 mx-auto"
               onClick={toggleAnswer}
+              disabled={isPremiumBlurred}
             >
               <Rotate className="h-5 w-5" />
               {showAnswer ? 'Show Question' : 'Show Answer'}
@@ -342,9 +395,9 @@ export default function StudyMode() {
           <div className="flex items-center gap-3">
             <button
               onClick={markAsMastered}
-              disabled={currentCard.is_mastered}
+              disabled={currentCard.is_mastered || isPremiumBlurred}
               className={`flex items-center gap-1 px-3 py-1 rounded-md ${
-                currentCard.is_mastered
+                currentCard.is_mastered || isPremiumBlurred
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-green-100 text-green-700 hover:bg-green-200'
               }`}
@@ -364,6 +417,21 @@ export default function StudyMode() {
           </button>
         </div>
       </div>
+
+      {isPremiumBlurred && (
+        <div className="mt-8 text-center">
+          <div className="mb-4 p-4 bg-orange-100 text-orange-800 rounded-lg">
+            <p className="font-medium mb-2">Premium Content</p>
+            <p>Upgrade to premium to access our expertly-curated flashcards and track your progress.</p>
+          </div>
+          <button
+            onClick={handleShowPaywall}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-medium"
+          >
+            Upgrade to Premium for Full Access
+          </button>
+        </div>
+      )}
     </div>
   );
 } 

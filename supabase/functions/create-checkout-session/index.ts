@@ -88,7 +88,7 @@ serve(async (req) => {
         },
       ],
       mode: 'subscription',
-      success_url: `${Deno.env.get('PUBLIC_APP_URL')}/chat?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${Deno.env.get('PUBLIC_APP_URL')}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${Deno.env.get('PUBLIC_APP_URL')}/chat`,
       metadata: {
         userId,

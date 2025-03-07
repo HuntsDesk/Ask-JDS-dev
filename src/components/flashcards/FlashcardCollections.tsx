@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, BookOpen, Trash2, Filter, Library } from 'lucide-react';
+import { Plus, Search, BookOpen, Trash2, Filter, Library, Book } from 'lucide-react';
 import Card from './Card';
 import EmptyState from './EmptyState';
 import LoadingSpinner from './LoadingSpinner';
@@ -10,6 +10,7 @@ import DeleteConfirmation from './DeleteConfirmation';
 import useToast from '@/hooks/useFlashcardToast';
 import Toast from './Toast';
 import useFlashcardAuth from '@/hooks/useFlashcardAuth';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface FlashcardCollection {
   id: string;
@@ -44,24 +45,24 @@ export default function FlashcardCollections() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [filter, setFilter] = useState<'all' | 'official' | 'my'>('all');
 
   useEffect(() => {
     Promise.all([
       loadCollections(),
       loadSubjects()
-    ]).finally(() => {
-      setLoading(false);
+    ]).then(() => {
+      // Check if there's a filter in the URL
+      const filterParam = searchParams.get('filter');
+      if (filterParam && ['all', 'official', 'my'].includes(filterParam)) {
+        setFilter(filterParam as 'all' | 'official' | 'my');
+      }
     });
-    
-    // Check if a subject filter was provided in the URL
-    const subjectId = searchParams.get('subject');
-    if (subjectId) {
-      setSelectedSubjectId(subjectId);
-    }
-  }, [searchParams]);
+  }, []);
 
   async function loadCollections() {
     try {
+      setLoading(true);
       let query = supabase
         .from('flashcard_collections')
         .select(`
@@ -84,31 +85,49 @@ export default function FlashcardCollections() {
       
       if (error) throw error;
       
-      // Get card counts and mastered counts for each collection
+      // Get card counts and mastered counts for each collection - using Promise.all
       const collectionsWithCounts = await Promise.all(
         (data || []).map(async (collection) => {
-          // Get total card count
-          const { count: totalCount, error: countError } = await supabase
-            .from('flashcards')
-            .select('*', { count: 'exact', head: true })
-            .eq('collection_id', collection.id);
+          try {
+            // Get total card count
+            const { count: totalCount, error: countError } = await supabase
+              .from('flashcards')
+              .select('*', { count: 'exact', head: true })
+              .eq('collection_id', collection.id);
+              
+            if (countError) throw countError;
             
-          if (countError) throw countError;
-          
-          // Get mastered card count
-          const { count: masteredCount, error: masteredError } = await supabase
-            .from('flashcards')
-            .select('*', { count: 'exact', head: true })
-            .eq('collection_id', collection.id)
-            .eq('is_mastered', true);
+            // Get mastered card count
+            const { count: masteredCount, error: masteredError } = await supabase
+              .from('flashcards')
+              .select('*', { count: 'exact', head: true })
+              .eq('collection_id', collection.id)
+              .eq('is_mastered', true);
+              
+            if (masteredError) throw masteredError;
             
-          if (masteredError) throw masteredError;
-          
-          return {
-            ...collection,
-            card_count: totalCount || 0,
-            mastered_count: masteredCount || 0
-          };
+            // Ensure subject is properly formatted as an object, not an array
+            const formattedSubject = Array.isArray(collection.subject) 
+              ? { id: collection.subject[0]?.id || '', name: collection.subject[0]?.name || '' }
+              : collection.subject;
+            
+            return {
+              ...collection,
+              card_count: totalCount || 0,
+              mastered_count: masteredCount || 0,
+              subject: formattedSubject
+            } as FlashcardCollection;
+          } catch (err) {
+            console.error('Error processing collection:', err);
+            return {
+              ...collection,
+              card_count: 0,
+              mastered_count: 0,
+              subject: Array.isArray(collection.subject) 
+                ? { id: collection.subject[0]?.id || '', name: collection.subject[0]?.name || '' }
+                : collection.subject
+            } as FlashcardCollection;
+          }
         })
       );
       
@@ -116,6 +135,8 @@ export default function FlashcardCollections() {
     } catch (err: any) {
       console.error('Error loading collections:', err);
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -181,19 +202,31 @@ export default function FlashcardCollections() {
     // For now, we'll just filter the collections client-side
   }
 
-  // Filter collections based on search query
+  function handleFilterChange(value: string) {
+    const newFilter = value as 'all' | 'official' | 'my';
+    setFilter(newFilter);
+    
+    // Update URL params
+    searchParams.set('filter', newFilter);
+    setSearchParams(searchParams);
+  }
+
+  // Filter collections based on search query and filter type
   const filteredCollections = collections.filter(collection => {
     const matchesSearch = searchQuery 
       ? collection.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (collection.description && collection.description.toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
     
-    return matchesSearch;
+    // Apply filter type
+    const matchesFilter = 
+      filter === 'all' ? true :
+      filter === 'official' ? collection.is_official :
+      filter === 'my' ? !collection.is_official :
+      true;
+    
+    return matchesSearch && matchesFilter;
   });
-
-  // Separate official and user collections
-  const officialCollections = filteredCollections.filter(c => c.is_official);
-  const userCollections = filteredCollections.filter(c => !c.is_official);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -224,39 +257,76 @@ export default function FlashcardCollections() {
         />
       )}
 
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          {selectedSubject ? `${selectedSubject.name} Collections` : 'My Collections'}
-        </h1>
-        <div className="relative">
-          <select
-            value={selectedSubjectId}
-            onChange={(e) => handleSubjectFilter(e.target.value)}
-            className="w-40 pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white appearance-none"
-          >
-            <option value="">All Subjects</option>
-            {subjects.map(subject => (
-              <option key={subject.id} value={subject.id}>
-                {subject.name}
-              </option>
-            ))}
-          </select>
-          <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-300" />
+      <div className="flex flex-col space-y-4 mb-6">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {selectedSubject ? `${selectedSubject.name} Collections` : 'Collections'}
+            </h1>
+            
+            {/* Subject filter moved to the left of the slider */}
+            <div className="relative">
+              <select
+                className="pl-8 pr-4 py-2 border rounded-md bg-white"
+                value={selectedSubjectId}
+                onChange={(e) => handleSubjectFilter(e.target.value)}
+              >
+                <option value="">All Subjects</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+              <Book className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 h-5 w-5" />
+            </div>
+          </div>
+          
+          {/* Filter tabs */}
+          <div>
+            <Tabs value={filter} onValueChange={handleFilterChange}>
+              <TabsList className="grid grid-cols-3" style={{ backgroundColor: '#f8f8f8' }}>
+                <TabsTrigger 
+                  value="all"
+                  className="data-[state=active]:bg-[#F37022] data-[state=active]:text-white"
+                >
+                  All
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="official"
+                  className="data-[state=active]:bg-[#F37022] data-[state=active]:text-white"
+                >
+                  Premium
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="my"
+                  className="data-[state=active]:bg-[#F37022] data-[state=active]:text-white"
+                >
+                  My Collections
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
       </div>
-      
+
+      {/* Collections grid */}
       <div className="mb-8">
-        {userCollections.length === 0 && officialCollections.length === 0 ? (
+        {filteredCollections.length === 0 ? (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
             <Library className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No collections found</h3>
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Create your first collection using the New Collection button in the navigation bar.
+              {filter === 'my' 
+                ? "You haven't created any collections yet. Create your first collection using the New Collection button."
+                : filter === 'official'
+                ? "No official collections available for this filter."
+                : "No collections found. Try adjusting your filters or create a new collection."}
             </p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {userCollections.map(collection => (
+            {filteredCollections.map(collection => (
               <Card 
                 key={collection.id}
                 title={collection.title}
@@ -265,23 +335,9 @@ export default function FlashcardCollections() {
                 count={collection.card_count || 0}
                 masteredCount={collection.mastered_count || 0}
                 link={`/flashcards/study/${collection.id}`}
-                onDelete={() => setCollectionToDelete(collection)}
+                onDelete={!collection.is_official ? () => setCollectionToDelete(collection) : undefined}
                 collectionId={collection.id}
-                isOfficial={false}
-                subjectId={collection.subject.id}
-              />
-            ))}
-            {officialCollections.map(collection => (
-              <Card 
-                key={collection.id}
-                title={collection.title}
-                description={collection.description}
-                tag={collection.subject.name}
-                count={collection.card_count || 0}
-                masteredCount={collection.mastered_count || 0}
-                link={`/flashcards/study/${collection.id}`}
-                collectionId={collection.id}
-                isOfficial={true}
+                isOfficial={collection.is_official || false}
                 subjectId={collection.subject.id}
               />
             ))}

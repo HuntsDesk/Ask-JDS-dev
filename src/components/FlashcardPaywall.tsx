@@ -1,28 +1,22 @@
 import React from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
-import { createCheckoutSession, FREE_MESSAGE_LIMIT } from '@/lib/subscription';
+import { createCheckoutSession } from '@/lib/subscription';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
-import { setPaywallActive } from '@/hooks/use-toast';
 import { BookOpen, MessageSquare, Clock } from 'lucide-react';
 
-interface PaywallProps {
+interface FlashcardPaywallProps {
   onCancel?: () => void;
-  preservedMessage?: string;
 }
 
-export function Paywall({ onCancel, preservedMessage }: PaywallProps) {
+export function FlashcardPaywall({ onCancel }: FlashcardPaywallProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast, dismiss } = useToast();
 
-  // Set the global paywall flag when this component mounts
+  // Dismiss toasts when component mounts
   React.useEffect(() => {
-    // Dismiss toasts immediately when the component mounts
     dismiss();
-    
-    // Set the global flag
-    setPaywallActive(true);
     
     // And also set up a small delay to ensure all toast animations are cleared
     const timeoutId = setTimeout(() => {
@@ -31,9 +25,6 @@ export function Paywall({ onCancel, preservedMessage }: PaywallProps) {
     
     return () => {
       clearTimeout(timeoutId);
-      // Reset the global flag when unmounting
-      setPaywallActive(false);
-      // Also dismiss toasts when unmounting to avoid flashes
       dismiss();
     };
   }, [dismiss]);
@@ -65,9 +56,6 @@ export function Paywall({ onCancel, preservedMessage }: PaywallProps) {
   };
   
   const handleCancel = () => {
-    // Reset the global paywall flag
-    setPaywallActive(false);
-  
     // Dismiss any toasts before closing the paywall
     dismiss();
     
@@ -79,12 +67,11 @@ export function Paywall({ onCancel, preservedMessage }: PaywallProps) {
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full"
-        style={{ position: 'absolute', zIndex: 9999 }}>
+      <Card className="max-w-md w-full" style={{ position: 'absolute', zIndex: 9999 }}>
         <CardHeader>
-          <CardTitle className="text-2xl">You've hit your message limit</CardTitle>
+          <CardTitle className="text-2xl">Unlock JDS Premium Flashcards</CardTitle>
           <CardDescription>
-            You've used all {FREE_MESSAGE_LIMIT} of your free messages. Upgrade to Ask JDS Premium for unlimited messages and premium flashcards.
+            You can create unlimited flashcards for free—no catch. But if you want access to Ask JDS Chat and our expert-curated flashcards, you must subscribe. Gotta put food on the table, kids!
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -92,12 +79,12 @@ export function Paywall({ onCancel, preservedMessage }: PaywallProps) {
             <h3 className="font-medium mb-2">For just $5/month, you get:</h3>
             <ul className="space-y-2 text-sm">
               <li className="flex items-start">
-                <MessageSquare className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
-                <span>Unlimited Ask JDS Chat for instant legal explanations</span>
-              </li>
-              <li className="flex items-start">
                 <BookOpen className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
                 <span>Full access to JDS curated flashcards—study smarter, not harder</span>
+              </li>
+              <li className="flex items-start">
+                <MessageSquare className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
+                <span>Unlimited Ask JDS Chat for instant legal explanations</span>
               </li>
               <li className="flex items-start">
                 <Clock className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" />
@@ -117,7 +104,10 @@ export function Paywall({ onCancel, preservedMessage }: PaywallProps) {
             disabled={isLoading}
           >
             {isLoading ? (
-              <LoadingSpinner size="sm" className="mr-2" />
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                Processing...
+              </>
             ) : (
               'Upgrade Now'
             )}

@@ -20,6 +20,7 @@ import { SettingsPage } from '@/components/settings/SettingsPage';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import FlashcardsPage from '@/components/flashcards/FlashcardsPage';
+import { SubscriptionSuccess } from '@/components/SubscriptionSuccess';
 import { AlertTriangle } from 'lucide-react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query-client';
@@ -108,6 +109,14 @@ const router = createBrowserRouter(
         element={
           <ProtectedRoute>
             <FlashcardsPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/subscription/success" 
+        element={
+          <ProtectedRoute>
+            <SubscriptionSuccess />
           </ProtectedRoute>
         } 
       />
